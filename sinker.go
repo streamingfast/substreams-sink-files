@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jhump/protoreflect/dynamic"
+
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams-sink-files/sink"
@@ -79,23 +79,23 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 }
 
 func (fs *FileSinker) handleBlockScopeData(cursor *sink.Cursor, data *pbsubstreams.BlockScopedData) error {
-	
+
 	for _, output := range data.Outputs {
 		if output.Name != fs.config.OutputModuleName {
 			continue
 		}
 
-		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(fs.outputModule.descriptor)
-		if err := dynMsg.Unmarshal(output.GetMapOutput().GetValue()); err != nil {
-			return fmt.Errorf("failed to unmarshal: %w", err)
+		resolved, err := fs.config.EntitiesQuery.Resolve(output.GetMapOutput().GetValue(), fs.outputModule.descriptor)
+		if err != nil {
+			return fmt.Errorf("failed to resolve entities query: %w", err)
 		}
 
-		cnt, err := json.Marshal(dynMsg)
+		cnt, err := json.Marshal(resolved)
 		if err != nil {
 			return err
 		}
 
-		fs.bundler.Write(cursor, dynMsg)
+		fs.bundler.Write(cursor, resolved)
 		fmt.Println(string(cnt))
 	}
 

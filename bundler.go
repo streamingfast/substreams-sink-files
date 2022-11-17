@@ -2,10 +2,11 @@ package substreams_file_sink
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/proto"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/substreams-sink-files/sink"
+	"google.golang.org/protobuf/proto"
 )
 
 type BundlerType string
@@ -43,11 +44,14 @@ func (b *Bundler) Roll() {
 
 }
 
-func (b *Bundler) Write(cursor *sink.Cursor, obj proto.Message) {
-	b.objects = append(b.objects, &BundleItem{
-		block: cursor.Block,
-		obj:   obj,
-	})
+func (b *Bundler) Write(cursor *sink.Cursor, entities []proto.Message) {
+	for _, entity := range entities {
+		b.objects = append(b.objects, &BundleItem{
+			block: cursor.Block,
+			obj:   entity,
+		})
+	}
+
 	b.currentBlock = cursor.Block
 }
 

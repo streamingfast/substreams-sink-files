@@ -2,12 +2,14 @@ package substreams_file_sink
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/substreams-sink-files/sink/pq"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
-	"strings"
 )
 
 type Config struct {
@@ -15,6 +17,7 @@ type Config struct {
 	FileStore               dstore.Store
 	BlockRange              string
 	Pkg                     *pbsubstreams.Package
+	EntitiesQuery           *pq.Query
 	OutputModuleName        string
 	ClientConfig            *client.SubstreamsClientConfig
 	BlockPerFile            uint64

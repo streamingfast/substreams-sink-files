@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/dstore"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -11,8 +10,10 @@ import (
 	"github.com/spf13/viper"
 	. "github.com/streamingfast/cli"
 	"github.com/streamingfast/derr"
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
 	substreamsfile "github.com/streamingfast/substreams-sink-files"
+	"github.com/streamingfast/substreams-sink-files/sink/pq"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	"go.uber.org/zap"
@@ -21,15 +22,18 @@ import (
 // sync run ./localdata api.dev.eth.mainnet.com substrema.spkg map_transfers .transfers[]
 
 var SyncRunCmd = Command(syncRunE,
-	"run <output_store> <endpoint> <manifest> <module> [<start>:<stop>]",
-	"Runs  extractor code",
-	RangeArgs(4, 5),
+	"run <endpoint> <manifest> <module> <path> <output_store> [<start>:<stop>]",
+	"Runs extractor code",
+	RangeArgs(5, 6),
 	Flags(func(flags *pflag.FlagSet) {
 		flags.String("state-store", "./state.yaml", "Output path where to store latest received cursor, if empty, cursor will not be persisted")
 		flags.BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 		flags.BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
 	}),
+	ExamplePrefixed("substreams-sink-files run",
+		"mainnet.eth.streaminfast.io substreams.spkg map_transfers '.transfers[]' ./localdata",
+	),
 	AfterAllHook(func(_ *cobra.Command) {
 		substreamsfile.RegisterMetrics()
 	}),
@@ -43,25 +47,34 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		cancelApp()
 	})
 
-	filestorePath := args[0]
-	endpoint := args[1]
-	manifestPath := args[2]
-	outputModuleName := args[3]
+	endpoint := args[0]
+	manifestPath := args[1]
+	outputModuleName := args[2]
+	entitiesPath := args[3]
+	filestorePath := args[4]
 	blockRange := ""
-	if len(args) > 4 {
-		blockRange = args[4]
+	if len(args) > 5 {
+		blockRange = args[5]
 	}
+
 	stateStorePath := viper.GetString("state-store")
 	blocksPerFile := viper.GetUint64("substreams-sink-files-run-file-block-count")
+
 	zlog.Info("sink to files",
 		zap.String("file_store_path", filestorePath),
 		zap.String("endpoint", endpoint),
+		zap.String("entities_path", entitiesPath),
 		zap.String("manifest_path", manifestPath),
 		zap.String("output_module_name", outputModuleName),
 		zap.String("block_range", blockRange),
 		zap.String("state_store", stateStorePath),
 		zap.Uint64("blocks_per_file", blocksPerFile),
 	)
+
+	entitiesQuery, err := pq.Parse(entitiesPath)
+	if err != nil {
+		return fmt.Errorf("parse entities path %q: %w", filestorePath, err)
+	}
 
 	fileOutputStore, err := dstore.NewStore(filestorePath, "", "", false)
 	if err != nil {
@@ -81,6 +94,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		FileStore:               fileOutputStore,
 		BlockRange:              blockRange,
 		Pkg:                     pkg,
+		EntitiesQuery:           entitiesQuery,
 		OutputModuleName:        outputModuleName,
 		BlockPerFile:            blocksPerFile,
 		ClientConfig: client.NewSubstreamsClientConfig(
