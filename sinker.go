@@ -2,7 +2,6 @@ package substreams_file_sink
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/streamingfast/logging"
@@ -124,13 +123,8 @@ func (fs *FileSinker) handleBlockScopeData(ctx context.Context, cursor *sink.Cur
 			return fmt.Errorf("failed to resolve entities query: %w", err)
 		}
 
-		cnt, err := json.Marshal(resolved)
-		if err != nil {
-			return err
-		}
+		fs.bdler.Write(resolved)
 
-		fs.bdler.Write(cursor, resolved)
-		fmt.Println(string(cnt))
 	}
 
 	return nil

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 )
 
 type BundlerType string
@@ -71,8 +71,10 @@ func (b *Bundler) Flush(ctx context.Context, blockNum uint64) (bool, error) {
 	return true, nil
 }
 
-func (b *Bundler) Write(obj proto.Message) {
-	b.objects = append(b.objects, obj)
+func (b *Bundler) Write(entities []proto.Message) {
+	for _, entity := range entities {
+		b.objects = append(b.objects, entity)
+	}
 }
 
 func (b *Bundler) save(ctx context.Context, boundary *bstream.Range) error {
