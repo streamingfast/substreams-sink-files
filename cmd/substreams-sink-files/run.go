@@ -57,9 +57,8 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		blockRange = args[5]
 	}
 
-	stateStorePath := viper.GetString("state-store")
-	blocksPerFile := viper.GetUint64("substreams-sink-files-run-file-block-count")
-
+	stateStorePath := viper.GetString("run-state-store")
+	blocksPerFile := viper.GetUint64("run-file-block-count")
 	zlog.Info("sink to files",
 		zap.String("file_store_path", filestorePath),
 		zap.String("endpoint", endpoint),
@@ -100,8 +99,8 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		ClientConfig: client.NewSubstreamsClientConfig(
 			endpoint,
 			apiToken,
-			viper.GetBool("substreams-sink-files-run-insecure"),
-			viper.GetBool("substreams-sink-files-run-plaintext"),
+			viper.GetBool("run-insecure"),
+			viper.GetBool("run-plaintext"),
 		),
 	}
 

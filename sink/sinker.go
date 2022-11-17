@@ -21,41 +21,38 @@ import (
 
 type Syncer struct {
 	*shutter.Shutter
-	stateStorePath string
 
-	clientConfig     *client.SubstreamsClientConfig
-	modules          *pbsubstreams.Modules
-	outputModule     *pbsubstreams.Module
-	outputModuleHash string
-	stats            *Stats
-
+	clientConfig          *client.SubstreamsClientConfig
+	modules               *pbsubstreams.Modules
+	outputModule          *pbsubstreams.Module
+	outputModuleHash      string
+	stats                 *Stats
+	state                 *State
 	blockScopeDataHandler BlockScopeDataHandler
 
 	logger *zap.Logger
 	tracer logging.Tracer
 }
 
-const BLOCK_PROGESS = 1000
-
 func New(
-	stateStorePath string,
 	modules *pbsubstreams.Modules,
 	outputModule *pbsubstreams.Module,
 	hash manifest.ModuleHash,
+	h BlockScopeDataHandler,
 	clientConfig *client.SubstreamsClientConfig,
-	dataHandler BlockScopeDataHandler,
+	cursor *Cursor,
 	logger *zap.Logger,
 	tracer logging.Tracer,
 ) (*Syncer, error) {
 	s := &Syncer{
 		Shutter:               shutter.New(),
-		stateStorePath:        stateStorePath,
 		clientConfig:          clientConfig,
 		modules:               modules,
 		outputModule:          outputModule,
 		outputModuleHash:      hex.EncodeToString(hash),
-		stats:                 NewStats(logger),
-		blockScopeDataHandler: dataHandler,
+		blockScopeDataHandler: h,
+		stats:                 newStats(logger),
+		state:                 newState(cursor),
 		logger:                logger,
 		tracer:                tracer,
 	}
@@ -71,19 +68,20 @@ func (s *Syncer) Start(ctx context.Context, blockRange *bstream.Range) error {
 	return s.run(ctx, blockRange)
 }
 
+func (s *Syncer) GetState() *State {
+	return s.state
+}
+
+func (s *Syncer) SetBlockDataHandler(h BlockScopeDataHandler) {
+	s.blockScopeDataHandler = h
+}
+
 func (s *Syncer) run(ctx context.Context, blockRange *bstream.Range) (err error) {
-	activeCursor := newBlankCursor()
-	backprocessingCompleted := false
-	headBlockReached := false
-
-	stateStore := newStateStore(s.stateStorePath, func() (*Cursor, bool, bool) {
-		return activeCursor, backprocessingCompleted, headBlockReached
-	}, s.logger)
-
-	activeCursor, err = stateStore.Read()
-	if err != nil {
-		return fmt.Errorf("read state: %w", err)
+	if s.blockScopeDataHandler == nil {
+		return fmt.Errorf("block scope data hanlder not set")
 	}
+
+	activeCursor := s.state.getCursor()
 
 	ssClient, closeFunc, callOpts, err := client.NewSubstreamsClient(s.clientConfig)
 	if err != nil {
@@ -173,13 +171,14 @@ func (s *Syncer) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 
 		case *pbsubstreams.Response_Data:
 			block := bstream.NewBlockRef(r.Data.Clock.Id, r.Data.Clock.Number)
-			cursor := newCursor(r.Data.Cursor, block)
+			cursor := NewCursor(r.Data.Cursor, block)
 
-			if err := s.blockScopeDataHandler(cursor, r.Data); err != nil {
+			if err := s.blockScopeDataHandler(ctx, cursor, r.Data); err != nil {
 				return activeCursor, fmt.Errorf("handle block scope data: %w", err)
 			}
 
 			activeCursor = cursor
+			s.state.setCursor(cursor)
 			s.stats.RecordBlock(block)
 			BlockCount.AddInt(1)
 

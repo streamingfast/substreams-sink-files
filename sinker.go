@@ -7,6 +7,7 @@ import (
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
+	"github.com/streamingfast/substreams-sink-files/bundler"
 	"github.com/streamingfast/substreams-sink-files/sink"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
@@ -20,7 +21,9 @@ type FileSinker struct {
 	*shutter.Shutter
 	config       *Config
 	outputModule *OutputModule
-	bundler      *Bundler
+	bdler        *bundler.Bundler
+	stateStore   *StateStore
+	sink         *sink.Syncer
 
 	logger *zap.Logger
 	tracer logging.Tracer
@@ -49,23 +52,41 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		return fmt.Errorf("resolve block range: %w", err)
 	}
 
-	fs.logger.Info("resolved block range", zap.Object("block_range", blockRange))
+	fs.stateStore = NewStateStore(fs.config.SubstreamStateStorePath)
 
-	fs.bundler = newBundler(fs.config.FileStore, fs.config.BlockPerFile, blockRange.StartBlock(), BundlerTypeJSON)
+	cursor, err := fs.stateStore.Read()
+	if err != nil {
+		return fmt.Errorf("faile to read curosor: %w", err)
+	}
+
+	fs.logger.Info("resolved block range", zap.Object("block_range", blockRange), zap.Reflect("cursor", cursor))
+
+	fs.bdler, err = bundler.New(
+		fs.config.FileStore,
+		fs.config.BlockPerFile,
+		blockRange.StartBlock(),
+		bundler.BundlerTypeJSON,
+		fs.logger,
+	)
+	if err != nil {
+		return fmt.Errorf("new bunlder: %w", err)
+	}
 
 	sink, err := sink.New(
-		fs.config.SubstreamStateStorePath,
 		fs.config.Pkg.Modules,
 		outputModule.module,
 		outputModule.hash,
-		fs.config.ClientConfig,
 		fs.handleBlockScopeData,
+		fs.config.ClientConfig,
+		cursor,
 		fs.logger,
 		fs.tracer,
 	)
 	if err != nil {
 		return fmt.Errorf("sink failed: %w", err)
 	}
+	fs.sink = sink
+
 	sink.OnTerminating(fs.Shutdown)
 	fs.OnTerminating(func(err error) {
 		fs.logger.Info(" file sinker terminating shutting down sink")
@@ -75,11 +96,24 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 	if err := sink.Start(ctx, blockRange); err != nil {
 		return fmt.Errorf("sink failed: %w", err)
 	}
-	return nil
+
+	if err := fs.bdler.ForceFlush(ctx); err != nil {
+		return fmt.Errorf("force flush: %w", err)
+	}
+
+	return fs.stateStore.Save(sink.GetState())
 }
 
-func (fs *FileSinker) handleBlockScopeData(cursor *sink.Cursor, data *pbsubstreams.BlockScopedData) error {
-
+func (fs *FileSinker) handleBlockScopeData(ctx context.Context, cursor *sink.Cursor, data *pbsubstreams.BlockScopedData) error {
+	flushed, err := fs.bdler.Flush(ctx, cursor.Block.Num())
+	if err != nil {
+		return fmt.Errorf("failed to roll: %w", err)
+	}
+	if flushed {
+		if err := fs.stateStore.Save(fs.sink.GetState()); err != nil {
+			return fmt.Errorf("save state store: %w", err)
+		}
+	}
 	for _, output := range data.Outputs {
 		if output.Name != fs.config.OutputModuleName {
 			continue
@@ -95,7 +129,7 @@ func (fs *FileSinker) handleBlockScopeData(cursor *sink.Cursor, data *pbsubstrea
 			return err
 		}
 
-		fs.bundler.Write(cursor, resolved)
+		fs.bdler.Write(cursor, resolved)
 		fmt.Println(string(cnt))
 	}
 

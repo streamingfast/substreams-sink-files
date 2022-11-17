@@ -20,7 +20,7 @@ type Stats struct {
 	logger    *zap.Logger
 }
 
-func NewStats(logger *zap.Logger) *Stats {
+func newStats(logger *zap.Logger) *Stats {
 	return &Stats{
 		Shutter: shutter.New(),
 
