@@ -6,10 +6,9 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 )
 
-func (q *Query) Resolve(root []byte, descriptor *desc.MessageDescriptor) (out []proto.Message, err error) {
+func (q *Query) Resolve(root []byte, descriptor *desc.MessageDescriptor) (out []*dynamic.Message, err error) {
 	zlog.Debug("resolving query", zap.String("message_type", descriptor.GetFullyQualifiedName()))
 
 	if len(q.Elements) != 3 {
@@ -58,14 +57,14 @@ func (q *Query) Resolve(root []byte, descriptor *desc.MessageDescriptor) (out []
 		return nil, nil
 	}
 
-	out = make([]proto.Message, count)
+	out = make([]*dynamic.Message, count)
 	for i := 0; i < count; i++ {
 		value, err := dynMsg.TryGetRepeatedField(fieldDesc, i)
 		if err != nil {
 			return nil, fmt.Errorf("get field %q of type %q at index %d length: %w", fieldName, fieldDesc.GetFullyQualifiedName(), i, err)
 		}
 
-		out[i] = value.(proto.Message)
+		out[i] = value.(*dynamic.Message)
 	}
 
 	if tracer.Enabled() {

@@ -3,7 +3,6 @@ package substreams_file_sink
 import (
 	"context"
 	"fmt"
-
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams-sink-files/bundler"

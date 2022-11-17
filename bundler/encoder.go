@@ -3,7 +3,7 @@ package bundler
 import (
 	"encoding/json"
 	"fmt"
-	"google.golang.org/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 type Encoder func([]proto.Message) ([]byte, error)
