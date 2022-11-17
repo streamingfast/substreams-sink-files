@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package test;
+
+option go_package = "github.com/streamingfast/substreams-sink-files/sink/pq/testdata;pbtest";
+
+message Transfers {
+    repeated Transfer transfers = 1;
+}
+
+message Transfer {
+    uint64 value = 1;
+}
