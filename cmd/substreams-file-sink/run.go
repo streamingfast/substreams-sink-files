@@ -32,7 +32,7 @@ var SyncRunCmd = Command(syncRunE,
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
 	}),
 	ExamplePrefixed("substreams-sink-files run",
-		"mainnet.eth.streaminfast.io substreams.spkg map_transfers '.transfers[]' ./localdata",
+		"mainnet.eth.streaminfast.io:443 substreams.spkg map_transfers '.transfers[]' ./localdata",
 	),
 	AfterAllHook(func(_ *cobra.Command) {
 		substreamsfile.RegisterMetrics()
