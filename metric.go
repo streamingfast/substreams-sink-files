@@ -1,0 +1,1 @@
+package substreams_file_sink
