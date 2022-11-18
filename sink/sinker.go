@@ -27,7 +27,6 @@ type Syncer struct {
 	outputModule          *pbsubstreams.Module
 	outputModuleHash      string
 	stats                 *Stats
-	state                 *State
 	blockScopeDataHandler BlockScopeDataHandler
 
 	logger *zap.Logger
@@ -40,7 +39,6 @@ func New(
 	hash manifest.ModuleHash,
 	h BlockScopeDataHandler,
 	clientConfig *client.SubstreamsClientConfig,
-	cursor *Cursor,
 	logger *zap.Logger,
 	tracer logging.Tracer,
 ) (*Syncer, error) {
@@ -52,7 +50,6 @@ func New(
 		outputModuleHash:      hex.EncodeToString(hash),
 		blockScopeDataHandler: h,
 		stats:                 newStats(logger),
-		state:                 newState(cursor),
 		logger:                logger,
 		tracer:                tracer,
 	}
@@ -60,28 +57,19 @@ func New(
 	return s, nil
 }
 
-func (s *Syncer) Start(ctx context.Context, blockRange *bstream.Range) error {
+func (s *Syncer) Start(ctx context.Context, blockRange *bstream.Range, cursor *Cursor) error {
 	s.OnTerminating(func(_ error) { s.stats.Close() })
 	s.stats.OnTerminated(func(err error) { s.Shutdown(err) })
 	s.stats.Start(2 * time.Second)
 
-	return s.run(ctx, blockRange)
+	return s.run(ctx, blockRange, cursor)
 }
 
-func (s *Syncer) GetState() *State {
-	return s.state
-}
-
-func (s *Syncer) SetBlockDataHandler(h BlockScopeDataHandler) {
-	s.blockScopeDataHandler = h
-}
-
-func (s *Syncer) run(ctx context.Context, blockRange *bstream.Range) (err error) {
+func (s *Syncer) run(ctx context.Context, blockRange *bstream.Range, cursor *Cursor) (err error) {
+	activeCursor := cursor
 	if s.blockScopeDataHandler == nil {
 		return fmt.Errorf("block scope data hanlder not set")
 	}
-
-	activeCursor := s.state.getCursor()
 
 	ssClient, closeFunc, callOpts, err := client.NewSubstreamsClient(s.clientConfig)
 	if err != nil {
@@ -178,7 +166,6 @@ func (s *Syncer) doRequest(ctx context.Context, defaultCursor *Cursor, req *pbsu
 			}
 
 			activeCursor = cursor
-			s.state.setCursor(cursor)
 			s.stats.RecordBlock(block)
 			BlockCount.AddInt(1)
 

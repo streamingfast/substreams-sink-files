@@ -19,9 +19,11 @@ type FileSinker struct {
 	*shutter.Shutter
 	config       *Config
 	outputModule *OutputModule
-	bdler        *bundler.Bundler
-	stateStore   *StateStore
-	sink         *sink.Syncer
+
+	bundler *bundler.Bundler
+
+	//stateStore   *bundler.StateStore
+	sink *sink.Syncer
 
 	logger *zap.Logger
 	tracer logging.Tracer
@@ -50,25 +52,23 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		return fmt.Errorf("resolve block range: %w", err)
 	}
 
-	fs.stateStore = NewStateStore(fs.config.SubstreamStateStorePath)
-
-	cursor, err := fs.stateStore.Read()
-	if err != nil {
-		return fmt.Errorf("faile to read curosor: %w", err)
-	}
-
-	fs.logger.Info("resolved block range", zap.Object("block_range", blockRange), zap.Reflect("cursor", cursor))
-
-	fs.bdler, err = bundler.New(
+	fs.bundler, err = bundler.New(
 		fs.config.FileStore,
+		fs.config.SubstreamStateStorePath,
 		fs.config.BlockPerFile,
-		blockRange.StartBlock(),
-		bundler.BundlerTypeJSON,
+		bundler.FileTypeJSONL,
 		fs.logger,
 	)
 	if err != nil {
 		return fmt.Errorf("new bunlder: %w", err)
 	}
+
+	cursor, err := fs.bundler.GetCursor()
+	if err != nil {
+		return fmt.Errorf("faile to read curosor: %w", err)
+	}
+
+	fs.logger.Info("setting up sink", zap.Object("block_range", blockRange), zap.Reflect("cursor", cursor))
 
 	sink, err := sink.New(
 		fs.config.Pkg.Modules,
@@ -76,7 +76,6 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		outputModule.hash,
 		fs.handleBlockScopeData,
 		fs.config.ClientConfig,
-		cursor,
 		fs.logger,
 		fs.tracer,
 	)
@@ -91,27 +90,30 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		sink.Shutdown(err)
 	})
 
-	if err := sink.Start(ctx, blockRange); err != nil {
+	expectedStartBlock := blockRange.StartBlock()
+	if !cursor.IsBlank() {
+		expectedStartBlock = cursor.Block.Num()
+	}
+
+	if err := fs.bundler.Start(expectedStartBlock); err != nil {
+		return fmt.Errorf("unable to start bunlder: %w", err)
+	}
+
+	if err := sink.Start(ctx, blockRange, cursor); err != nil {
 		return fmt.Errorf("sink failed: %w", err)
 	}
 
-	if err := fs.bdler.ForceFlush(ctx); err != nil {
-		return fmt.Errorf("force flush: %w", err)
+	if err := fs.bundler.Stop(); err != nil {
+		return fmt.Errorf("force stop: %w", err)
 	}
-
-	return fs.stateStore.Save(sink.GetState())
+	return nil
 }
 
 func (fs *FileSinker) handleBlockScopeData(ctx context.Context, cursor *sink.Cursor, data *pbsubstreams.BlockScopedData) error {
-	flushed, err := fs.bdler.Flush(ctx, cursor.Block.Num())
-	if err != nil {
+	if err := fs.bundler.Roll(ctx, cursor.Block.Num()); err != nil {
 		return fmt.Errorf("failed to roll: %w", err)
 	}
-	if flushed {
-		if err := fs.stateStore.Save(fs.sink.GetState()); err != nil {
-			return fmt.Errorf("save state store: %w", err)
-		}
-	}
+
 	for _, output := range data.Outputs {
 		if output.Name != fs.config.OutputModuleName {
 			continue
@@ -122,8 +124,9 @@ func (fs *FileSinker) handleBlockScopeData(ctx context.Context, cursor *sink.Cur
 			return fmt.Errorf("failed to resolve entities query: %w", err)
 		}
 
-		fs.bdler.Write(resolved)
-
+		if err := fs.bundler.Write(cursor, resolved); err != nil {
+			return fmt.Errorf("failed to write entities: %w", err)
+		}
 	}
 
 	return nil

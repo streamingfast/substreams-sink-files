@@ -20,3 +20,7 @@ func NewCursor(cursor string, block bstream.BlockRef) *Cursor {
 func NewBlankCursor() *Cursor {
 	return NewCursor("", bstream.BlockRefEmpty)
 }
+
+func (c *Cursor) IsBlank() bool {
+	return c.Cursor == ""
+}
