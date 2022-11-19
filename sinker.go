@@ -103,7 +103,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		return fmt.Errorf("sink failed: %w", err)
 	}
 
-	if err := fs.bundler.Stop(); err != nil {
+	if err := fs.bundler.Stop(ctx); err != nil {
 		return fmt.Errorf("force stop: %w", err)
 	}
 	return nil

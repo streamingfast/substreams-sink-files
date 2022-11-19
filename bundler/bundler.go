@@ -44,7 +44,7 @@ func New(
 	}
 
 	b := &Bundler{
-		fileStores: newDStoreIO(store, 3, zlogger),
+		fileStores: newDStoreIO(store, store, fileType, zlogger),
 		stateStore: stateStore,
 		fileType:   fileType,
 		size:       size,
@@ -67,21 +67,22 @@ func (b *Bundler) GetCursor() (*sink.Cursor, error) {
 func (b *Bundler) Start(blockNum uint64) error {
 	boundaryRange := b.newBoundary(blockNum)
 	b.activeBoundary = boundaryRange
-	filename := b.filename(boundaryRange)
-	b.zlogger.Info("starting new file boundary", zap.Stringer("boundary", boundaryRange), zap.String("fiename", filename))
 
-	if err := b.fileStores.StartFile(filename); err != nil {
+	b.zlogger.Info("starting new file boundary", zap.Stringer("boundary", boundaryRange))
+	filename, err := b.fileStores.StartFile(boundaryRange)
+	if err != nil {
 		return fmt.Errorf("start file: %w", err)
 	}
 
+	b.zlogger.Info("boundary started", zap.Stringer("boundary", boundaryRange), zap.String("workingFilename", filename))
 	b.stateStore.newBoundary(filename, boundaryRange)
 	return nil
 }
 
-func (b *Bundler) Stop() error {
+func (b *Bundler) Stop(ctx context.Context) error {
 	b.zlogger.Info("stopping file boundary")
 
-	if err := b.fileStores.CloseFile(); err != nil {
+	if err := b.fileStores.CloseFile(ctx); err != nil {
 		return fmt.Errorf("closing file: %w", err)
 	}
 
@@ -106,7 +107,7 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 		zap.Uint64("block_num", blockNum),
 	)
 
-	if err := b.Stop(); err != nil {
+	if err := b.Stop(ctx); err != nil {
 		return fmt.Errorf("stop active boundary: %w", err)
 	}
 
@@ -114,7 +115,7 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 		if err := b.Start(boundary.StartBlock()); err != nil {
 			return fmt.Errorf("start skipping boundary: %w", err)
 		}
-		if err := b.Stop(); err != nil {
+		if err := b.Stop(ctx); err != nil {
 			return fmt.Errorf("stop skipping boundary: %w", err)
 		}
 	}
@@ -130,10 +131,6 @@ func (b *Bundler) newBoundary(containingBlockNum uint64) *bstream.Range {
 	return bstream.NewRangeExcludingEnd(startBlock, startBlock+b.size)
 }
 
-func (b *Bundler) filename(blockRange *bstream.Range) string {
-	return fmt.Sprintf("%010d-%010d.%s", blockRange.StartBlock(), (*blockRange.EndBlock()), b.fileType)
-}
-
 func (b *Bundler) Write(cursor *sink.Cursor, entities []*dynamic.Message) error {
 	var buf []byte
 	for _, entity := range entities {
@@ -144,7 +141,7 @@ func (b *Bundler) Write(cursor *sink.Cursor, entities []*dynamic.Message) error 
 		buf = append(buf, cnt...)
 	}
 
-	if _, err := b.fileStores.activeWriter.Write(buf); err != nil {
+	if _, err := b.fileStores.Write(buf); err != nil {
 		return fmt.Errorf("failed to write data: %w", err)
 	}
 

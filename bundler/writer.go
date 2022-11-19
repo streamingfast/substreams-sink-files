@@ -3,6 +3,7 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
@@ -11,63 +12,107 @@ import (
 )
 
 type DStoreIO struct {
-	outputStore   dstore.Store
+	workingStore dstore.Store
+	outputStore  dstore.Store
+
 	retryAttempts uint64
 	fileType      FileType
 
-	activeFileName string
-	activeWriter   *io.PipeWriter
+	activeFile *ActiveFile
 
-	fileStatus chan *FileWrittenStatus
+	fileStatus chan *ActiveFile
 	zlogger    *zap.Logger
 }
 
+type ActiveFile struct {
+	writer          *io.PipeWriter
+	blockRange      *bstream.Range
+	workingFilename string
+	outputFilename  string
+	err             error
+}
+
 func newDStoreIO(
+	workingStore dstore.Store,
 	outputStore dstore.Store,
-	retryAttempts uint64,
+	fileType FileType,
 	zlogger *zap.Logger,
 ) *DStoreIO {
 	return &DStoreIO{
+		workingStore:  workingStore,
 		outputStore:   outputStore,
-		retryAttempts: retryAttempts,
-		fileStatus:    make(chan *FileWrittenStatus, 1),
+		fileType:      fileType,
+		retryAttempts: 3,
+		fileStatus:    make(chan *ActiveFile, 1),
 		zlogger:       zlogger,
 	}
 }
 
-func (s *DStoreIO) HasActiveFile() {
-
+func (s *DStoreIO) workingFilename(blockRange *bstream.Range) string {
+	return fmt.Sprintf("%010d-%010d.tmp.%s", blockRange.StartBlock(), (*blockRange.EndBlock()), s.fileType)
 }
-func (s *DStoreIO) StartFile(filename string) error {
-	if s.activeWriter != nil {
-		return fmt.Errorf("unable to start a file whilte one %q  is open", s.activeFileName)
+
+func (s *DStoreIO) finalFilename(blockRange *bstream.Range) string {
+	return fmt.Sprintf("%010d-%010d.%s", blockRange.StartBlock(), (*blockRange.EndBlock()), s.fileType)
+}
+
+func (s *DStoreIO) StartFile(blockRange *bstream.Range) (string, error) {
+	if s.activeFile != nil {
+		return "", fmt.Errorf("unable to start a file whilte one %q  is open", s.activeFile.workingFilename)
 	}
+
 	pr, pw := io.Pipe()
-	go s.launchWriter(filename, pr)
-	s.activeWriter = pw
-	s.activeFileName = filename
-	return nil
+
+	a := &ActiveFile{
+		writer:          pw,
+		blockRange:      blockRange,
+		workingFilename: s.workingFilename(blockRange),
+		outputFilename:  s.finalFilename(blockRange),
+	}
+
+	go s.launchWriter(a, pr)
+	s.activeFile = a
+
+	return a.workingFilename, nil
 }
 
-func (s *DStoreIO) CloseFile() error {
+func (s *DStoreIO) CloseFile(ctx context.Context) error {
+	if s.activeFile == nil {
+		return fmt.Errorf("no active file")
+	}
 	s.zlogger.Info("closing file")
-	if err := s.activeWriter.Close(); err != nil {
+	if err := s.activeFile.writer.Close(); err != nil {
 		return fmt.Errorf("close activeWriter: %w", err)
 	}
-
-	s.activeFileName = ""
-	s.activeWriter = nil
 
 	status := <-s.fileStatus
 
 	if status.err != nil {
-		return fmt.Errorf("failed to write file %q: %w", status.filename, status.err)
+		return fmt.Errorf("failed to write file %q: %w", status.workingFilename, status.err)
 	}
 
-	s.zlogger.Info("file written successfully",
-		zap.String("filename", status.filename),
+	workingPath := s.workingStore.ObjectPath(status.workingFilename)
+	outputPath := s.outputStore.ObjectPath(status.outputFilename)
+
+	s.zlogger.Info("working file written successfully, copying to output store",
+		zap.String("output_path", status.outputFilename),
+		zap.String("working_path", workingPath),
 	)
+
+	if err := s.outputStore.CopyObject(ctx, workingPath, outputPath); err != nil {
+		return fmt.Errorf("copy file from workignto output: %w", err)
+	}
+
+	s.activeFile = nil
+
 	return nil
+}
+
+func (s *DStoreIO) Write(data []byte) (int, error) {
+	if s.activeFile == nil {
+		return 0, fmt.Errorf("failed to write to active file")
+	}
+	return s.activeFile.writer.Write(data)
 }
 
 type FileWrittenStatus struct {
@@ -75,19 +120,17 @@ type FileWrittenStatus struct {
 	err      error
 }
 
-func (s *DStoreIO) launchWriter(filename string, reader io.Reader) {
+func (s *DStoreIO) launchWriter(file *ActiveFile, reader io.Reader) {
 	t0 := time.Now()
 	err := derr.Retry(s.retryAttempts, func(ctx context.Context) error {
-		return s.outputStore.WriteObject(ctx, filename, reader)
+		return s.outputStore.WriteObject(ctx, file.workingFilename, reader)
 	})
 	if err != nil {
 		s.zlogger.Warn("failed to upload file", zap.Error(err), zap.Duration("elapsed", time.Since(t0)))
 	} else {
-		s.zlogger.Info("uploaded", zap.String("filename", filename), zap.Duration("elapsed", time.Since(t0)))
+		s.zlogger.Info("uploaded", zap.String("workingFilename", file.workingFilename), zap.Duration("elapsed", time.Since(t0)))
 	}
+	file.err = err
 
-	s.fileStatus <- &FileWrittenStatus{
-		filename: filename,
-		err:      err,
-	}
+	s.fileStatus <- file
 }

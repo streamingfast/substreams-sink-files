@@ -14,7 +14,8 @@ type StateStore struct {
 	startOnce sync.Once
 
 	outputPath string
-	state      *State
+
+	state *State
 }
 
 func loadStateStore(outputPath string) (*StateStore, error) {

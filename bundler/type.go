@@ -33,5 +33,5 @@ type blockState struct {
 type activeBoundary struct {
 	StartBlockNumber uint64 `yaml:"start_block_number"`
 	EndBlockNumber   uint64 `yaml:"end_block_number"`
-	Filename         string `yaml:"filename"`
+	Filename         string `yaml:"workingFilename"`
 }
