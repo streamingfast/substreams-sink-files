@@ -3,9 +3,8 @@ module github.com/streamingfast/substreams-sink-files
 go 1.18
 
 require (
-	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/ghodss/yaml v1.0.0
-	github.com/jhump/protoreflect v1.12.0
+	github.com/jhump/protoreflect v1.14.0
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
@@ -14,11 +13,15 @@ require (
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
 	github.com/streamingfast/dstore v0.1.1-0.20221025062403-36259703e97b
-	github.com/streamingfast/logging v0.0.0-20220511154537-ce373d264338
+	github.com/streamingfast/logging v0.0.0-20220813175024-b4fbb0e893df
+	github.com/streamingfast/pq v0.0.0-20221121194429-f73b4c86e80e
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams v0.0.22-0.20221114180215-45c1bb1d4804
-	go.uber.org/zap v1.21.0
+	github.com/streamingfast/substreams-sink v0.0.0-20221121185911-2eb26e3c507a
+	go.uber.org/zap v1.23.0
 )
+
+require github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
@@ -43,7 +46,7 @@ require (
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.0 // indirect
@@ -57,7 +60,7 @@ require (
 	github.com/lithammer/dedent v1.1.0 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/lunixbochs/vtclean v0.0.0-20180621232353-2d01aacdc34a // indirect
-	github.com/magiconair/properties v1.8.1 // indirect
+	github.com/magiconair/properties v1.8.1
 	github.com/manifoldco/promptui v0.8.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-ieproxy v0.0.1 // indirect
@@ -72,7 +75,6 @@ require (
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.32.1 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/sethvargo/go-retry v0.2.3 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
 	github.com/spf13/cast v1.3.0 // indirect
@@ -82,7 +84,7 @@ require (
 	github.com/streamingfast/dgrpc v0.0.0-20221031174241-978a7951c117 // indirect
 	github.com/streamingfast/opaque v0.0.0-20210811180740-0c01d37ea308 // indirect
 	github.com/streamingfast/pbgo v0.0.6-0.20220630154121-2e8bba36234e // indirect
-	github.com/stretchr/testify v1.8.0 // indirect
+	github.com/stretchr/testify v1.8.1
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/teris-io/shortid v0.0.0-20171029131806-771a37caa5cf // indirect
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869 // indirect
@@ -99,7 +101,7 @@ require (
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10 // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirects
+	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect; indirects
 	google.golang.org/api v0.99.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20221014173430-6e2ab493f96b // indirect

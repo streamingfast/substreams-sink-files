@@ -3,10 +3,11 @@ package substreams_file_sink
 import (
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
+	sink "github.com/streamingfast/substreams-sink"
 	"github.com/streamingfast/substreams-sink-files/bundler"
-	"github.com/streamingfast/substreams-sink-files/sink"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -23,7 +24,7 @@ type FileSinker struct {
 	bundler *bundler.Bundler
 
 	//stateStore   *bundler.StateStore
-	sink *sink.Syncer
+	sink *sink.Sinker
 
 	logger *zap.Logger
 	tracer logging.Tracer

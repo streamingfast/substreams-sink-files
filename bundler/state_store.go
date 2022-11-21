@@ -2,12 +2,13 @@ package bundler
 
 import (
 	"fmt"
-	"github.com/ghodss/yaml"
-	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams-sink-files/sink"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/ghodss/yaml"
+	"github.com/streamingfast/bstream"
+	sink "github.com/streamingfast/substreams-sink"
 )
 
 type StateStore struct {

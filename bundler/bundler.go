@@ -3,11 +3,12 @@ package bundler
 import (
 	"context"
 	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams-sink-files/sink"
+	sink "github.com/streamingfast/substreams-sink"
 	"go.uber.org/zap"
 )
 

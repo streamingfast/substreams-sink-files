@@ -6,7 +6,7 @@ import (
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/substreams-sink-files/sink/pq"
+	"github.com/streamingfast/pq"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
