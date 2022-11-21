@@ -19,7 +19,7 @@ type StateStore struct {
 }
 
 func loadStateStore(outputPath string) (*StateStore, error) {
-	var s *State
+	s := &State{}
 	content, err := os.ReadFile(outputPath)
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("read file: %w", err)

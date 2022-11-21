@@ -26,6 +26,7 @@ var SyncRunCmd = Command(syncRunE,
 	"Runs extractor code",
 	RangeArgs(5, 6),
 	Flags(func(flags *pflag.FlagSet) {
+		flags.String("file-working-dir", "./localdata/working", "Working store where we accumulate data")
 		flags.String("state-store", "./state.yaml", "Output path where to store latest received cursor, if empty, cursor will not be persisted")
 		flags.BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 		flags.BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
@@ -51,19 +52,22 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	manifestPath := args[1]
 	outputModuleName := args[2]
 	entitiesPath := args[3]
-	filestorePath := args[4]
+	fileOutputPath := args[4]
 	blockRange := ""
 	if len(args) > 5 {
 		blockRange = args[5]
 	}
 
+	fileWorkingPath := viper.GetString("run-file-working-dir")
 	stateStorePath := viper.GetString("run-state-store")
 	blocksPerFile := viper.GetUint64("run-file-block-count")
 	zlog.Info("sink to files",
-		zap.String("file_store_path", filestorePath),
+		zap.String("file_output_path", fileOutputPath),
+		zap.String("file_working_path", fileWorkingPath),
 		zap.String("endpoint", endpoint),
 		zap.String("entities_path", entitiesPath),
 		zap.String("manifest_path", manifestPath),
+		zap.String("working_dir_path", fileWorkingPath),
 		zap.String("output_module_name", outputModuleName),
 		zap.String("block_range", blockRange),
 		zap.String("state_store", stateStorePath),
@@ -72,12 +76,17 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 
 	entitiesQuery, err := pq.Parse(entitiesPath)
 	if err != nil {
-		return fmt.Errorf("parse entities path %q: %w", filestorePath, err)
+		return fmt.Errorf("parse entities path %q: %w", fileOutputPath, err)
 	}
 
-	fileOutputStore, err := dstore.NewStore(filestorePath, "", "", false)
+	fileOutputStore, err := dstore.NewStore(fileOutputPath, "", "", false)
 	if err != nil {
-		return fmt.Errorf("new store %q: %w", filestorePath, err)
+		return fmt.Errorf("new store %q: %w", fileOutputPath, err)
+	}
+
+	fileWorkingStore, err := dstore.NewStore(fileWorkingPath, "", "", false)
+	if err != nil {
+		return fmt.Errorf("new store %q: %w", fileWorkingPath, err)
 	}
 
 	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPath))
@@ -90,7 +99,8 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 
 	config := &substreamsfile.Config{
 		SubstreamStateStorePath: stateStorePath,
-		FileStore:               fileOutputStore,
+		FileOutputStore:         fileOutputStore,
+		FileWorkingStore:        fileWorkingStore,
 		BlockRange:              blockRange,
 		Pkg:                     pkg,
 		EntitiesQuery:           entitiesQuery,

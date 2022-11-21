@@ -14,13 +14,14 @@ import (
 
 type Config struct {
 	SubstreamStateStorePath string
-	FileStore               dstore.Store
+	FileOutputStore         dstore.Store
 	BlockRange              string
 	Pkg                     *pbsubstreams.Package
 	EntitiesQuery           *pq.Query
 	OutputModuleName        string
 	ClientConfig            *client.SubstreamsClientConfig
 	BlockPerFile            uint64
+	FileWorkingStore        dstore.Store
 }
 
 type OutputModule struct {

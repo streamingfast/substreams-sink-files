@@ -92,15 +92,14 @@ func (s *DStoreIO) CloseFile(ctx context.Context) error {
 	}
 
 	workingPath := s.workingStore.ObjectPath(status.workingFilename)
-	outputPath := s.outputStore.ObjectPath(status.outputFilename)
-
+	
 	s.zlogger.Info("working file written successfully, copying to output store",
 		zap.String("output_path", status.outputFilename),
 		zap.String("working_path", workingPath),
 	)
 
-	if err := s.outputStore.CopyObject(ctx, workingPath, outputPath); err != nil {
-		return fmt.Errorf("copy file from workignto output: %w", err)
+	if err := s.outputStore.PushLocalFile(ctx, workingPath, status.outputFilename); err != nil {
+		return fmt.Errorf("copy file from worling output: %w", err)
 	}
 
 	s.activeFile = nil
@@ -123,7 +122,7 @@ type FileWrittenStatus struct {
 func (s *DStoreIO) launchWriter(file *ActiveFile, reader io.Reader) {
 	t0 := time.Now()
 	err := derr.Retry(s.retryAttempts, func(ctx context.Context) error {
-		return s.outputStore.WriteObject(ctx, file.workingFilename, reader)
+		return s.workingStore.WriteObject(ctx, file.workingFilename, reader)
 	})
 	if err != nil {
 		s.zlogger.Warn("failed to upload file", zap.Error(err), zap.Duration("elapsed", time.Since(t0)))
