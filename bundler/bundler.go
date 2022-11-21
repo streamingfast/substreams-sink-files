@@ -18,16 +18,14 @@ const (
 )
 
 type Bundler struct {
-	size    uint64
-	encoder Encoder
+	blockCount uint64
+	encoder    Encoder
 
-	fileStores *DStoreIO
-	stateStore *StateStore
-	fileType   FileType
-
+	fileStores     *DStoreIO
+	stateStore     *StateStore
+	fileType       FileType
 	activeBoundary *bstream.Range
-
-	zlogger *zap.Logger
+	zlogger        *zap.Logger
 }
 
 func New(
@@ -48,7 +46,7 @@ func New(
 		fileStores: newDStoreIO(workingStore, outputStore, fileType, zlogger),
 		stateStore: stateStore,
 		fileType:   fileType,
-		size:       size,
+		blockCount: size,
 		zlogger:    zlogger,
 	}
 
@@ -100,7 +98,9 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 		return nil
 	}
 
-	boundaries := boundariesToSkip(b.activeBoundary, blockNum, b.size)
+	//0 - 100
+	// 563
+	boundaries := boundariesToSkip(b.activeBoundary, blockNum, b.blockCount)
 
 	b.zlogger.Info("block_num is not in active boundary",
 		zap.Stringer("active_boundary", b.activeBoundary),
@@ -128,8 +128,8 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 }
 
 func (b *Bundler) newBoundary(containingBlockNum uint64) *bstream.Range {
-	startBlock := containingBlockNum - (containingBlockNum % b.size)
-	return bstream.NewRangeExcludingEnd(startBlock, startBlock+b.size)
+	startBlock := containingBlockNum - (containingBlockNum % b.blockCount)
+	return bstream.NewRangeExcludingEnd(startBlock, startBlock+b.blockCount)
 }
 
 func (b *Bundler) Write(cursor *sink.Cursor, entities []*dynamic.Message) error {

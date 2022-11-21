@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"io"
@@ -12,6 +11,7 @@ import (
 )
 
 type DStoreIO struct {
+	//TODO: this should be a local file store? os.File
 	workingStore dstore.Store
 	outputStore  dstore.Store
 
@@ -70,7 +70,7 @@ func (s *DStoreIO) StartFile(blockRange *bstream.Range) (string, error) {
 		outputFilename:  s.finalFilename(blockRange),
 	}
 
-	go s.launchWriter(a, pr)
+	go s.launchWriter(context.Background(), a, pr)
 	s.activeFile = a
 
 	return a.workingFilename, nil
@@ -85,14 +85,19 @@ func (s *DStoreIO) CloseFile(ctx context.Context) error {
 		return fmt.Errorf("close activeWriter: %w", err)
 	}
 
-	status := <-s.fileStatus
+	var status *ActiveFile
+	select {
+	case status = <-s.fileStatus:
+	case <-ctx.Done():
+		return fmt.Errorf("context completed")
+	}
 
 	if status.err != nil {
 		return fmt.Errorf("failed to write file %q: %w", status.workingFilename, status.err)
 	}
 
 	workingPath := s.workingStore.ObjectPath(status.workingFilename)
-	
+
 	s.zlogger.Info("working file written successfully, copying to output store",
 		zap.String("output_path", status.outputFilename),
 		zap.String("working_path", workingPath),
@@ -114,16 +119,9 @@ func (s *DStoreIO) Write(data []byte) (int, error) {
 	return s.activeFile.writer.Write(data)
 }
 
-type FileWrittenStatus struct {
-	filename string
-	err      error
-}
-
-func (s *DStoreIO) launchWriter(file *ActiveFile, reader io.Reader) {
+func (s *DStoreIO) launchWriter(ctx context.Context, file *ActiveFile, reader io.Reader) {
 	t0 := time.Now()
-	err := derr.Retry(s.retryAttempts, func(ctx context.Context) error {
-		return s.workingStore.WriteObject(ctx, file.workingFilename, reader)
-	})
+	err := s.workingStore.WriteObject(ctx, file.workingFilename, reader)
 	if err != nil {
 		s.zlogger.Warn("failed to upload file", zap.Error(err), zap.Duration("elapsed", time.Since(t0)))
 	} else {
