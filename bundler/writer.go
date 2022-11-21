@@ -7,25 +7,23 @@ import (
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"io"
+	"os"
 	"time"
 )
 
 type DStoreIO struct {
-	//TODO: this should be a local file store? os.File
-	workingStore dstore.Store
-	outputStore  dstore.Store
-
+	workingDir    string
+	outputStore   dstore.Store
 	retryAttempts uint64
 	fileType      FileType
-
-	activeFile *ActiveFile
-
-	fileStatus chan *ActiveFile
-	zlogger    *zap.Logger
+	activeFile    *ActiveFile
+	fileStatus    chan *ActiveFile
+	zlogger       *zap.Logger
 }
 
 type ActiveFile struct {
 	writer          *io.PipeWriter
+	fileWriter      io.Writer
 	blockRange      *bstream.Range
 	workingFilename string
 	outputFilename  string
@@ -33,13 +31,13 @@ type ActiveFile struct {
 }
 
 func newDStoreIO(
-	workingStore dstore.Store,
+	workingDir string,
 	outputStore dstore.Store,
 	fileType FileType,
 	zlogger *zap.Logger,
 ) *DStoreIO {
 	return &DStoreIO{
-		workingStore:  workingStore,
+		workingDir:    workingDir,
 		outputStore:   outputStore,
 		fileType:      fileType,
 		retryAttempts: 3,
@@ -61,16 +59,23 @@ func (s *DStoreIO) StartFile(blockRange *bstream.Range) (string, error) {
 		return "", fmt.Errorf("unable to start a file whilte one %q  is open", s.activeFile.workingFilename)
 	}
 
+	workingFilename := s.workingFilename(blockRange)
+	fileWriter, err := os.Create(workingFilename)
+	if err != nil {
+		return "", fmt.Errorf("unable to create working file %q: %w", workingFilename, err)
+	}
+
 	pr, pw := io.Pipe()
 
 	a := &ActiveFile{
 		writer:          pw,
 		blockRange:      blockRange,
-		workingFilename: s.workingFilename(blockRange),
+		fileWriter:      fileWriter,
+		workingFilename: workingFilename,
 		outputFilename:  s.finalFilename(blockRange),
 	}
 
-	go s.launchWriter(context.Background(), a, pr)
+	go s.launchWriter(a, pr)
 	s.activeFile = a
 
 	return a.workingFilename, nil
@@ -96,14 +101,12 @@ func (s *DStoreIO) CloseFile(ctx context.Context) error {
 		return fmt.Errorf("failed to write file %q: %w", status.workingFilename, status.err)
 	}
 
-	workingPath := s.workingStore.ObjectPath(status.workingFilename)
-
 	s.zlogger.Info("working file written successfully, copying to output store",
 		zap.String("output_path", status.outputFilename),
-		zap.String("working_path", workingPath),
+		zap.String("working_path", status.workingFilename),
 	)
 
-	if err := s.outputStore.PushLocalFile(ctx, workingPath, status.outputFilename); err != nil {
+	if err := s.outputStore.PushLocalFile(ctx, status.workingFilename, status.outputFilename); err != nil {
 		return fmt.Errorf("copy file from worling output: %w", err)
 	}
 
@@ -119,9 +122,9 @@ func (s *DStoreIO) Write(data []byte) (int, error) {
 	return s.activeFile.writer.Write(data)
 }
 
-func (s *DStoreIO) launchWriter(ctx context.Context, file *ActiveFile, reader io.Reader) {
+func (s *DStoreIO) launchWriter(file *ActiveFile, reader io.Reader) {
 	t0 := time.Now()
-	err := s.workingStore.WriteObject(ctx, file.workingFilename, reader)
+	_, err := io.Copy(file.fileWriter, reader)
 	if err != nil {
 		s.zlogger.Warn("failed to upload file", zap.Error(err), zap.Duration("elapsed", time.Since(t0)))
 	} else {

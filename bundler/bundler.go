@@ -30,7 +30,7 @@ type Bundler struct {
 
 func New(
 	outputStore dstore.Store,
-	workingStore dstore.Store,
+	workingDir string,
 	stateFilePath string,
 	size uint64,
 	fileType FileType,
@@ -43,7 +43,7 @@ func New(
 	}
 
 	b := &Bundler{
-		fileStores: newDStoreIO(workingStore, outputStore, fileType, zlogger),
+		fileStores: newDStoreIO(workingDir, outputStore, fileType, zlogger),
 		stateStore: stateStore,
 		fileType:   fileType,
 		blockCount: size,

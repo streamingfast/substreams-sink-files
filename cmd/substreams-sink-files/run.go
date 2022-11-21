@@ -58,16 +58,16 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		blockRange = args[5]
 	}
 
-	fileWorkingPath := viper.GetString("run-file-working-dir")
+	fileWorkingDir := viper.GetString("run-file-working-dir")
 	stateStorePath := viper.GetString("run-state-store")
 	blocksPerFile := viper.GetUint64("run-file-block-count")
 	zlog.Info("sink to files",
 		zap.String("file_output_path", fileOutputPath),
-		zap.String("file_working_path", fileWorkingPath),
+		zap.String("file_working_dir", fileWorkingDir),
 		zap.String("endpoint", endpoint),
 		zap.String("entities_path", entitiesPath),
 		zap.String("manifest_path", manifestPath),
-		zap.String("working_dir_path", fileWorkingPath),
+		zap.String("working_dir_path", fileWorkingDir),
 		zap.String("output_module_name", outputModuleName),
 		zap.String("block_range", blockRange),
 		zap.String("state_store", stateStorePath),
@@ -84,11 +84,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("new store %q: %w", fileOutputPath, err)
 	}
 
-	fileWorkingStore, err := dstore.NewStore(fileWorkingPath, "", "", false)
-	if err != nil {
-		return fmt.Errorf("new store %q: %w", fileWorkingPath, err)
-	}
-
 	zlog.Info("reading substreams manifest", zap.String("manifest_path", manifestPath))
 	pkg, err := manifest.NewReader(manifestPath).Read()
 	if err != nil {
@@ -100,7 +95,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	config := &substreamsfile.Config{
 		SubstreamStateStorePath: stateStorePath,
 		FileOutputStore:         fileOutputStore,
-		FileWorkingStore:        fileWorkingStore,
+		FileWorkingDir:          fileWorkingDir,
 		BlockRange:              blockRange,
 		Pkg:                     pkg,
 		EntitiesQuery:           entitiesQuery,

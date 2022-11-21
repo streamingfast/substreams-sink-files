@@ -54,7 +54,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 
 	fs.bundler, err = bundler.New(
 		fs.config.FileOutputStore,
-		fs.config.FileWorkingStore,
+		fs.config.FileWorkingDir,
 		fs.config.SubstreamStateStorePath,
 		fs.config.BlockPerFile,
 		bundler.FileTypeJSONL,

@@ -14,6 +14,7 @@ import (
 
 type Config struct {
 	SubstreamStateStorePath string
+	FileWorkingDir          string
 	FileOutputStore         dstore.Store
 	BlockRange              string
 	Pkg                     *pbsubstreams.Package
@@ -21,7 +22,6 @@ type Config struct {
 	OutputModuleName        string
 	ClientConfig            *client.SubstreamsClientConfig
 	BlockPerFile            uint64
-	FileWorkingStore        dstore.Store
 }
 
 type OutputModule struct {
