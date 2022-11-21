@@ -67,7 +67,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		zap.String("endpoint", endpoint),
 		zap.String("entities_path", entitiesPath),
 		zap.String("manifest_path", manifestPath),
-		zap.String("working_dir_path", fileWorkingDir),
 		zap.String("output_module_name", outputModuleName),
 		zap.String("block_range", blockRange),
 		zap.String("state_store", stateStorePath),

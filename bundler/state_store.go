@@ -58,7 +58,7 @@ func (s *StateStore) setCursor(cursor *sink.Cursor) {
 	})
 
 	s.state.Cursor = cursor.Cursor
-	s.state.Block = blockState{
+	s.state.Block = BlockState{
 		ID:     cursor.Block.ID(),
 		Number: cursor.Block.Num(),
 	}

@@ -72,7 +72,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 
 	fs.logger.Info("setting up sink", zap.Object("block_range", blockRange), zap.Reflect("cursor", cursor))
 
-	sink, err := sink.New(
+	fs.sink, err = sink.New(
 		fs.config.Pkg.Modules,
 		outputModule.module,
 		outputModule.hash,
@@ -84,12 +84,11 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("sink failed: %w", err)
 	}
-	fs.sink = sink
 
-	sink.OnTerminating(fs.Shutdown)
+	fs.sink.OnTerminating(fs.Shutdown)
 	fs.OnTerminating(func(err error) {
 		fs.logger.Info(" file sinker terminating shutting down sink")
-		sink.Shutdown(err)
+		fs.sink.Shutdown(err)
 	})
 
 	expectedStartBlock := blockRange.StartBlock()
@@ -101,7 +100,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		return fmt.Errorf("unable to start bunlder: %w", err)
 	}
 
-	if err := sink.Start(ctx, blockRange, cursor); err != nil {
+	if err := fs.sink.Start(ctx, blockRange, cursor); err != nil {
 		return fmt.Errorf("sink failed: %w", err)
 	}
 

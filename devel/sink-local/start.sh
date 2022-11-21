@@ -1,15 +1,11 @@
 #!/usr/bin/env bash
 
-ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )"  && pwd )"
+ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
 sink="$ROOT/../substreams-sink-files"
 
-finish() {
-    kill -s TERM $active_pid &> /dev/null || true
-}
-
 main() {
-  trap "finish" EXIT
-  pushd "$ROOT" &> /dev/null
+  cd "$ROOT" &> /dev/null
 
   while getopts "hc" opt; do
     case $opt in
@@ -21,20 +17,22 @@ main() {
   shift $((OPTIND-1))
   [[ $1 = "--" ]] && shift
 
-    set -e
+  set -e
 
-    localfolder="`pwd`/localdata"
+  output_dir="$ROOT/localdata"
+  if [[ "$clean" == true ]]; then
+    rm -rf "$output_dir" 2> /dev/null || true
+  fi
 
-    $sink run \
-      "api-dev.streamingfast.io:443" \
-      "gs://staging.dfuseio-global.appspot.com/lidar/spkgs/lidar-yuga-retention-v0.0.2.spkg" \
-      "map_transfers" \
-      ".transfers[]" \
-      "$localfolder" \
-      "12292922:+10" \
-      "$@"
-
-  popd &> /dev/null
+  exec $sink run \
+    "--file-working-dir=$output_dir/working" \
+    "--state-store=$output_dir/working/state.yaml" \
+    "mainnet.eth.streamingfast.io:443" \
+    "gs://staging.dfuseio-global.appspot.com/lidar/spkgs/lidar-yuga-retention-v0.0.2.spkg" \
+    "map_transfers" \
+    ".transfers[]" \
+    "$output_dir/out" \
+    "$@"
 }
 
 usage_error() {

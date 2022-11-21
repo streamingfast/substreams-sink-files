@@ -3,12 +3,14 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
-	"io"
-	"os"
-	"time"
 )
 
 type DStoreIO struct {
@@ -56,10 +58,14 @@ func (s *DStoreIO) finalFilename(blockRange *bstream.Range) string {
 
 func (s *DStoreIO) StartFile(blockRange *bstream.Range) (string, error) {
 	if s.activeFile != nil {
-		return "", fmt.Errorf("unable to start a file whilte one %q  is open", s.activeFile.workingFilename)
+		return "", fmt.Errorf("unable to start a file while one %q is open", s.activeFile.workingFilename)
 	}
 
-	workingFilename := s.workingFilename(blockRange)
+	if err := os.MkdirAll(s.workingDir, os.ModePerm); err != nil {
+		return "", fmt.Errorf("unable to create working directories: %w", err)
+	}
+
+	workingFilename := filepath.Join(s.workingDir, s.workingFilename(blockRange))
 	fileWriter, err := os.Create(workingFilename)
 	if err != nil {
 		return "", fmt.Errorf("unable to create working file %q: %w", workingFilename, err)
