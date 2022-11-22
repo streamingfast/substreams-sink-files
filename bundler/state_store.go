@@ -26,7 +26,7 @@ func loadStateStore(outputPath string) (*StateStore, error) {
 		return nil, fmt.Errorf("read file: %w", err)
 	}
 	if err != nil && os.IsNotExist(err) {
-		s = newSate()
+		s = newState()
 	}
 
 	if err := yaml.Unmarshal(content, s); err != nil {

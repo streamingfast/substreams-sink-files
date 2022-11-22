@@ -17,7 +17,7 @@ type State struct {
 	RestartedAt time.Time `yaml:"restarted_at,omitempty" json:"restarted_at,omitempty"`
 }
 
-func newSate() *State {
+func newState() *State {
 	return &State{
 		Cursor: "",
 		Block:  BlockState{"", 0},
