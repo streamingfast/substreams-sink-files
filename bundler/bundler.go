@@ -3,6 +3,8 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/dynamic"
@@ -37,6 +39,10 @@ func New(
 	fileType FileType,
 	zlogger *zap.Logger,
 ) (*Bundler, error) {
+	stateFileDirectory := filepath.Dir(stateFilePath)
+	if err := os.MkdirAll(stateFileDirectory, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("create state file directories: %w", err)
+	}
 
 	stateStore, err := loadStateStore(stateFilePath)
 	if err != nil {
