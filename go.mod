@@ -12,12 +12,12 @@ require (
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
 	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
-	github.com/streamingfast/dstore v0.1.1-0.20221025062403-36259703e97b
+	github.com/streamingfast/dstore v0.1.1-0.20221118114203-13f4092e3bf0
 	github.com/streamingfast/logging v0.0.0-20220813175024-b4fbb0e893df
 	github.com/streamingfast/pq v0.0.0-20221121194429-f73b4c86e80e
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams v0.0.22-0.20221114180215-45c1bb1d4804
-	github.com/streamingfast/substreams-sink v0.0.0-20221121212016-ffb387fd92df
+	github.com/streamingfast/substreams v0.0.22-0.20221124192438-6ef4954ac865
+	github.com/streamingfast/substreams-sink v0.0.0-20221124211032-c538b1cb0732
 	go.uber.org/zap v1.23.0
 )
 

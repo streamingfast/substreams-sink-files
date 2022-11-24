@@ -73,6 +73,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 	fs.logger.Info("setting up sink", zap.Object("block_range", blockRange), zap.Reflect("cursor", cursor))
 
 	fs.sink, err = sink.New(
+		sink.SubstreamsModeProduction,
 		fs.config.Pkg.Modules,
 		outputModule.module,
 		outputModule.hash,
