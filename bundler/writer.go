@@ -107,14 +107,16 @@ func (s *DStoreIO) CloseFile(ctx context.Context) error {
 		return fmt.Errorf("failed to write file %q: %w", status.workingFilename, status.err)
 	}
 
-	s.zlogger.Info("working file written successfully, copying to output store",
-		zap.String("output_path", status.outputFilename),
-		zap.String("working_path", status.workingFilename),
-	)
-
+	t0 := time.Now()
 	if err := s.outputStore.PushLocalFile(ctx, status.workingFilename, status.outputFilename); err != nil {
 		return fmt.Errorf("copy file from worling output: %w", err)
 	}
+
+	s.zlogger.Info("working file successfully copied to output store",
+		zap.String("output_path", status.outputFilename),
+		zap.String("working_path", status.workingFilename),
+		zap.Duration("elapsed", time.Since(t0)),
+	)
 
 	s.activeFile = nil
 
