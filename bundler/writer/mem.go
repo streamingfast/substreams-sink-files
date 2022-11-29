@@ -7,14 +7,14 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
-	"time"
 )
 
 type Mem struct {
 	baseWriter
 
-	activeFilename string
-	buf            []byte
+	activeFilename  string
+	activeFileStats *stats
+	buf             []byte
 }
 
 func NewMem(
@@ -23,12 +23,8 @@ func NewMem(
 	zlogger *zap.Logger,
 ) Writer {
 	return &Mem{
-		baseWriter: baseWriter{
-			outputStore: outputStore,
-			fileType:    fileType,
-			zlogger:     zlogger,
-		},
-		buf: []byte{},
+		baseWriter: newBaseWriter(outputStore, fileType, zlogger),
+		buf:        []byte{},
 	}
 }
 
@@ -42,25 +38,20 @@ func (m *Mem) StartBoundary(blockRange *bstream.Range) error {
 	return nil
 }
 
-func (m *Mem) CloseBoundary(ctx context.Context) error {
+func (m *Mem) Upload(ctx context.Context) error {
+	if err := m.outputStore.WriteObject(ctx, m.activeFilename, bytes.NewReader(m.buf)); err != nil {
+		return fmt.Errorf("failed to write object: %w", err)
+	}
+	m.zlogger.Info("uploading in memory data", zap.String("filename", m.activeFilename))
+	m.activeFilename = ""
+	return nil
+}
 
+func (m *Mem) CloseBoundary(_ context.Context) error {
 	if m.activeFilename == "" {
 		return fmt.Errorf("no active file")
 	}
 	m.zlogger.Info("closing file")
-
-	t0 := time.Now()
-
-	if err := m.outputStore.WriteObject(ctx, m.activeFilename, bytes.NewReader(m.buf)); err != nil {
-		return fmt.Errorf("failed to write object: %w", err)
-	}
-
-	m.zlogger.Info("in memory buffered copied to output store",
-		zap.String("output_path", m.activeFilename),
-		zap.Duration("elapsed", time.Since(t0)),
-	)
-
-	m.activeFilename = ""
 	return nil
 }
 

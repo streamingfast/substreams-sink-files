@@ -11,7 +11,7 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20221117104246-5660c4ba5e8c
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
-	github.com/streamingfast/dmetrics v0.0.0-20221107142404-e88fe183f07d
+	github.com/streamingfast/dmetrics v0.0.0-20221129121022-a1733eca1981
 	github.com/streamingfast/dstore v0.1.1-0.20221118114203-13f4092e3bf0
 	github.com/streamingfast/logging v0.0.0-20220813175024-b4fbb0e893df
 	github.com/streamingfast/pq v0.0.0-20221121194429-f73b4c86e80e

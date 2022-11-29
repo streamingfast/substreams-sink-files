@@ -18,7 +18,7 @@ type Bundler struct {
 	blockCount uint64
 	encoder    Encoder
 
-	boundaryWriter writer.Writer
+	boundaryWriter *writer.Metered
 	stateStore     *StateStore
 	fileType       writer.FileType
 	activeBoundary *bstream.Range
@@ -28,7 +28,7 @@ type Bundler struct {
 func New(
 	stateFilePath string,
 	size uint64,
-	boundaryWriter writer.Writer,
+	boundaryWriter *writer.Metered,
 	zlogger *zap.Logger,
 ) (*Bundler, error) {
 	stateFileDirectory := filepath.Dir(stateFilePath)

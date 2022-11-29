@@ -33,12 +33,13 @@ type OutputModule struct {
 	hash       manifest.ModuleHash
 }
 
-func (c *Config) getBoundaryWriter(zlogger *zap.Logger) writer.Writer {
+func (c *Config) getBoundaryWriter(zlogger *zap.Logger) *writer.Metered {
 	fileType := writer.FileTypeJSONL
+	w := writer.NewDStoreIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
 	if c.InMemoryWriter {
-		return writer.NewMem(c.FileOutputStore, fileType, zlogger)
+		w = writer.NewMem(c.FileOutputStore, fileType, zlogger)
 	}
-	return writer.NewDStoreIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
+	return writer.NewMeteredWriter(w, zlogger)
 }
 
 func (c *Config) validateOutputModule() (*OutputModule, error) {

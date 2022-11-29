@@ -19,6 +19,15 @@ type baseWriter struct {
 	zlogger     *zap.Logger
 }
 
+func newBaseWriter(outputStore dstore.Store, fileType FileType, zlogger *zap.Logger) baseWriter {
+	return baseWriter{
+		outputStore: outputStore,
+		fileType:    fileType,
+		zlogger:     zlogger,
+	}
+
+}
+
 func (b baseWriter) filename(blockRange *bstream.Range) string {
 	return fmt.Sprintf("%010d-%010d.%s", blockRange.StartBlock(), *blockRange.EndBlock(), b.fileType)
 }

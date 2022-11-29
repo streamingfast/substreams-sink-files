@@ -37,11 +37,7 @@ func NewDStoreIO(
 	zlogger *zap.Logger,
 ) Writer {
 	return &DStoreIO{
-		baseWriter: baseWriter{
-			outputStore: outputStore,
-			fileType:    fileType,
-			zlogger:     zlogger,
-		},
+		baseWriter: newBaseWriter(outputStore, fileType, zlogger),
 		workingDir: workingDir,
 		fileStatus: make(chan *activeFile, 1),
 	}
@@ -101,20 +97,18 @@ func (s *DStoreIO) CloseBoundary(ctx context.Context) error {
 	if status.err != nil {
 		return fmt.Errorf("failed to write file %q: %w", status.workingFilename, status.err)
 	}
+	return nil
+}
 
-	t0 := time.Now()
-	if err := s.outputStore.PushLocalFile(ctx, status.workingFilename, status.outputFilename); err != nil {
+func (s *DStoreIO) Upload(ctx context.Context) error {
+	if err := s.outputStore.PushLocalFile(ctx, s.activeFile.workingFilename, s.activeFile.outputFilename); err != nil {
 		return fmt.Errorf("copy file from worling output: %w", err)
 	}
-
-	s.zlogger.Info("working file successfully copied to output store",
-		zap.String("output_path", status.outputFilename),
-		zap.String("working_path", status.workingFilename),
-		zap.Duration("elapsed", time.Since(t0)),
-	)
-
 	s.activeFile = nil
-
+	s.zlogger.Info("working file successfully copied to output store",
+		zap.String("output_path", s.activeFile.outputFilename),
+		zap.String("working_path", s.activeFile.workingFilename),
+	)
 	return nil
 }
 
