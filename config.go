@@ -2,6 +2,8 @@ package substreams_file_sink
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
+	"go.uber.org/zap"
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
@@ -22,12 +24,21 @@ type Config struct {
 	OutputModuleName        string
 	ClientConfig            *client.SubstreamsClientConfig
 	BlockPerFile            uint64
+	InMemoryWriter          bool
 }
 
 type OutputModule struct {
 	descriptor *desc.MessageDescriptor
 	module     *pbsubstreams.Module
 	hash       manifest.ModuleHash
+}
+
+func (c *Config) getBoundaryWriter(zlogger *zap.Logger) writer.Writer {
+	fileType := writer.FileTypeJSONL
+	if c.InMemoryWriter {
+		return writer.NewMem(c.FileOutputStore, fileType, zlogger)
+	}
+	return writer.NewDStoreIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
 }
 
 func (c *Config) validateOutputModule() (*OutputModule, error) {

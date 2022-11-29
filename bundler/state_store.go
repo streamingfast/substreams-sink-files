@@ -42,10 +42,9 @@ func (s *StateStore) Read() (cursor *sink.Cursor, err error) {
 	return sink.NewCursor(s.state.Cursor, bstream.NewBlockRef(s.state.Block.ID, s.state.Block.Number)), nil
 }
 
-func (s *StateStore) newBoundary(filename string, boundary *bstream.Range) {
+func (s *StateStore) newBoundary(boundary *bstream.Range) {
 	s.state.ActiveBoundary.StartBlockNumber = boundary.StartBlock()
 	s.state.ActiveBoundary.EndBlockNumber = *boundary.EndBlock()
-	s.state.ActiveBoundary.Filename = filename
 }
 
 func (s *StateStore) setCursor(cursor *sink.Cursor) {

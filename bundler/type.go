@@ -32,5 +32,4 @@ type BlockState struct {
 type ActiveBoundary struct {
 	StartBlockNumber uint64 `yaml:"start_block_number"  json:"start_block_number"`
 	EndBlockNumber   uint64 `yaml:"end_block_number"  json:"end_block_number"`
-	Filename         string `yaml:"working_filename"  json:"working_filename"`
 }

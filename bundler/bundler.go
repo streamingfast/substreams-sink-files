@@ -3,40 +3,32 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"os"
 	"path/filepath"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
 	sink "github.com/streamingfast/substreams-sink"
 	"go.uber.org/zap"
-)
-
-type FileType string
-
-const (
-	FileTypeJSONL FileType = "jsonl"
 )
 
 type Bundler struct {
 	blockCount uint64
 	encoder    Encoder
 
-	fileStores     *DStoreIO
+	boundaryWriter writer.Writer
 	stateStore     *StateStore
-	fileType       FileType
+	fileType       writer.FileType
 	activeBoundary *bstream.Range
 	zlogger        *zap.Logger
 }
 
 func New(
-	outputStore dstore.Store,
-	workingDir string,
 	stateFilePath string,
 	size uint64,
-	fileType FileType,
+	boundaryWriter writer.Writer,
 	zlogger *zap.Logger,
 ) (*Bundler, error) {
 	stateFileDirectory := filepath.Dir(stateFilePath)
@@ -50,18 +42,17 @@ func New(
 	}
 
 	b := &Bundler{
-		fileStores: newDStoreIO(workingDir, outputStore, fileType, zlogger),
-		stateStore: stateStore,
-		fileType:   fileType,
-		blockCount: size,
-		zlogger:    zlogger,
+		boundaryWriter: boundaryWriter,
+		stateStore:     stateStore,
+		blockCount:     size,
+		zlogger:        zlogger,
 	}
 
-	switch fileType {
-	case FileTypeJSONL:
+	switch boundaryWriter.Type() {
+	case writer.FileTypeJSONL:
 		b.encoder = JSONLEncode
 	default:
-		return nil, fmt.Errorf("invalid file type %q", fileType)
+		return nil, fmt.Errorf("invalid file type %q", boundaryWriter.Type())
 	}
 	return b, nil
 }
@@ -75,20 +66,19 @@ func (b *Bundler) Start(blockNum uint64) error {
 	b.activeBoundary = boundaryRange
 
 	b.zlogger.Info("starting new file boundary", zap.Stringer("boundary", boundaryRange))
-	filename, err := b.fileStores.StartFile(boundaryRange)
-	if err != nil {
+	if err := b.boundaryWriter.StartBoundary(boundaryRange); err != nil {
 		return fmt.Errorf("start file: %w", err)
 	}
 
-	b.zlogger.Info("boundary started", zap.Stringer("boundary", boundaryRange), zap.String("workingFilename", filename))
-	b.stateStore.newBoundary(filename, boundaryRange)
+	b.zlogger.Info("boundary started", zap.Stringer("boundary", boundaryRange))
+	b.stateStore.newBoundary(boundaryRange)
 	return nil
 }
 
 func (b *Bundler) Stop(ctx context.Context) error {
 	b.zlogger.Info("stopping file boundary")
 
-	if err := b.fileStores.CloseFile(ctx); err != nil {
+	if err := b.boundaryWriter.CloseBoundary(ctx); err != nil {
 		return fmt.Errorf("closing file: %w", err)
 	}
 
@@ -149,7 +139,7 @@ func (b *Bundler) Write(cursor *sink.Cursor, entities []*dynamic.Message) error 
 		buf = append(buf, cnt...)
 	}
 
-	if _, err := b.fileStores.Write(buf); err != nil {
+	if err := b.boundaryWriter.Write(buf); err != nil {
 		return fmt.Errorf("failed to write data: %w", err)
 	}
 

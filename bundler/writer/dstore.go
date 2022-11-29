@@ -1,4 +1,4 @@
-package bundler
+package writer
 
 import (
 	"context"
@@ -13,17 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type DStoreIO struct {
-	workingDir    string
-	outputStore   dstore.Store
-	retryAttempts uint64
-	fileType      FileType
-	activeFile    *ActiveFile
-	fileStatus    chan *ActiveFile
-	zlogger       *zap.Logger
-}
-
-type ActiveFile struct {
+type activeFile struct {
 	writer          *io.PipeWriter
 	fileWriter      io.Writer
 	blockRange      *bstream.Range
@@ -32,19 +22,28 @@ type ActiveFile struct {
 	err             error
 }
 
-func newDStoreIO(
+type DStoreIO struct {
+	baseWriter
+
+	workingDir string
+	activeFile *activeFile
+	fileStatus chan *activeFile
+}
+
+func NewDStoreIO(
 	workingDir string,
 	outputStore dstore.Store,
 	fileType FileType,
 	zlogger *zap.Logger,
-) *DStoreIO {
+) Writer {
 	return &DStoreIO{
-		workingDir:    workingDir,
-		outputStore:   outputStore,
-		fileType:      fileType,
-		retryAttempts: 3,
-		fileStatus:    make(chan *ActiveFile, 1),
-		zlogger:       zlogger,
+		baseWriter: baseWriter{
+			outputStore: outputStore,
+			fileType:    fileType,
+			zlogger:     zlogger,
+		},
+		workingDir: workingDir,
+		fileStatus: make(chan *activeFile, 1),
 	}
 }
 
@@ -52,42 +51,38 @@ func (s *DStoreIO) workingFilename(blockRange *bstream.Range) string {
 	return fmt.Sprintf("%010d-%010d.tmp.%s", blockRange.StartBlock(), (*blockRange.EndBlock()), s.fileType)
 }
 
-func (s *DStoreIO) finalFilename(blockRange *bstream.Range) string {
-	return fmt.Sprintf("%010d-%010d.%s", blockRange.StartBlock(), (*blockRange.EndBlock()), s.fileType)
-}
-
-func (s *DStoreIO) StartFile(blockRange *bstream.Range) (string, error) {
+func (s *DStoreIO) StartBoundary(blockRange *bstream.Range) error {
 	if s.activeFile != nil {
-		return "", fmt.Errorf("unable to start a file while one %q is open", s.activeFile.workingFilename)
+		return fmt.Errorf("unable to start a file while one %q is open", s.activeFile.workingFilename)
 	}
 
 	if err := os.MkdirAll(s.workingDir, os.ModePerm); err != nil {
-		return "", fmt.Errorf("unable to create working directories: %w", err)
+		return fmt.Errorf("unable to create working directories: %w", err)
 	}
 
 	workingFilename := filepath.Join(s.workingDir, s.workingFilename(blockRange))
 	fileWriter, err := os.Create(workingFilename)
 	if err != nil {
-		return "", fmt.Errorf("unable to create working file %q: %w", workingFilename, err)
+		return fmt.Errorf("unable to create working file %q: %w", workingFilename, err)
 	}
 
 	pr, pw := io.Pipe()
 
-	a := &ActiveFile{
+	a := &activeFile{
 		writer:          pw,
 		blockRange:      blockRange,
 		fileWriter:      fileWriter,
 		workingFilename: workingFilename,
-		outputFilename:  s.finalFilename(blockRange),
+		outputFilename:  s.filename(blockRange),
 	}
 
 	go s.launchWriter(a, pr)
 	s.activeFile = a
 
-	return a.workingFilename, nil
+	return nil
 }
 
-func (s *DStoreIO) CloseFile(ctx context.Context) error {
+func (s *DStoreIO) CloseBoundary(ctx context.Context) error {
 	if s.activeFile == nil {
 		return fmt.Errorf("no active file")
 	}
@@ -96,7 +91,7 @@ func (s *DStoreIO) CloseFile(ctx context.Context) error {
 		return fmt.Errorf("close activeWriter: %w", err)
 	}
 
-	var status *ActiveFile
+	var status *activeFile
 	select {
 	case status = <-s.fileStatus:
 	case <-ctx.Done():
@@ -123,14 +118,17 @@ func (s *DStoreIO) CloseFile(ctx context.Context) error {
 	return nil
 }
 
-func (s *DStoreIO) Write(data []byte) (int, error) {
+func (s *DStoreIO) Write(data []byte) error {
 	if s.activeFile == nil {
-		return 0, fmt.Errorf("failed to write to active file")
+		return fmt.Errorf("failed to write to active file")
 	}
-	return s.activeFile.writer.Write(data)
+	if _, err := s.activeFile.writer.Write(data); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (s *DStoreIO) launchWriter(file *ActiveFile, reader io.Reader) {
+func (s *DStoreIO) launchWriter(file *activeFile, reader io.Reader) {
 	t0 := time.Now()
 	_, err := io.Copy(file.fileWriter, reader)
 	if err != nil {
