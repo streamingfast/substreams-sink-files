@@ -10,6 +10,8 @@ type stats struct {
 	creationStart time.Time
 	uploadStart   time.Time
 
+	fileCount uint64
+
 	lastUploadTime   time.Duration
 	uploadingTime    *dmetrics.AvgDurationCounter
 	lastCreationTime time.Duration
@@ -25,6 +27,7 @@ func newStats() *stats {
 
 func (s *stats) startCollecting() {
 	s.creationStart = time.Now()
+	s.fileCount++
 }
 
 func (s *stats) stopCollecting() {
@@ -48,5 +51,6 @@ func (s *stats) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	encoder.AddDuration("last_upload_time", s.lastUploadTime)
 	encoder.AddString("creation_time", s.creationTime.String())
 	encoder.AddDuration("last_creation_time", s.lastCreationTime)
+	encoder.AddUint64("file_count", s.fileCount)
 	return nil
 }
