@@ -53,10 +53,14 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		return fmt.Errorf("resolve block range: %w", err)
 	}
 
+	writer, err := fs.config.getBoundaryWriter(fs.logger)
+	if err != nil {
+		return fmt.Errorf("unable to get boundary writer: %w", err)
+	}
 	fs.bundler, err = bundler.New(
 		fs.config.SubstreamStateStorePath,
 		fs.config.BlockPerFile,
-		fs.config.getBoundaryWriter(fs.logger),
+		writer,
 		fs.logger,
 	)
 	if err != nil {

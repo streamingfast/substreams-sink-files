@@ -24,7 +24,8 @@ type Config struct {
 	OutputModuleName        string
 	ClientConfig            *client.SubstreamsClientConfig
 	BlockPerFile            uint64
-	InMemoryWriter          bool
+
+	BoundaryWriterType string
 }
 
 type OutputModule struct {
@@ -33,13 +34,21 @@ type OutputModule struct {
 	hash       manifest.ModuleHash
 }
 
-func (c *Config) getBoundaryWriter(zlogger *zap.Logger) *writer.Metered {
+func (c *Config) getBoundaryWriter(zlogger *zap.Logger) (*writer.Metered, error) {
 	fileType := writer.FileTypeJSONL
-	w := writer.NewDStoreIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
-	if c.InMemoryWriter {
+
+	var w writer.Writer
+	switch c.BoundaryWriterType {
+	case "local_file":
+		w = writer.NewDStoreIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
+	case "in_memory":
 		w = writer.NewMem(c.FileOutputStore, fileType, zlogger)
+	case "noop":
+		w = writer.NewNoop(fileType, zlogger)
+	default:
+		return nil, fmt.Errorf("unknown boundary writer: %s", c.BoundaryWriterType)
 	}
-	return writer.NewMeteredWriter(w, zlogger)
+	return writer.NewMeteredWriter(w, zlogger), nil
 }
 
 func (c *Config) validateOutputModule() (*OutputModule, error) {
