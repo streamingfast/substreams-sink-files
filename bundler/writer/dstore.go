@@ -27,7 +27,7 @@ type DStoreIO struct {
 
 	workingDir string
 	activeFile *activeFile
-	fileStatus chan *activeFile
+	fileStatus chan bool
 }
 
 func NewDStoreIO(
@@ -39,7 +39,7 @@ func NewDStoreIO(
 	return &DStoreIO{
 		baseWriter: newBaseWriter(outputStore, fileType, zlogger),
 		workingDir: workingDir,
-		fileStatus: make(chan *activeFile, 1),
+		fileStatus: make(chan bool, 1),
 	}
 }
 
@@ -87,15 +87,14 @@ func (s *DStoreIO) CloseBoundary(ctx context.Context) error {
 		return fmt.Errorf("close activeWriter: %w", err)
 	}
 
-	var status *activeFile
 	select {
-	case status = <-s.fileStatus:
+	case _ = <-s.fileStatus:
 	case <-ctx.Done():
 		return fmt.Errorf("context completed")
 	}
 
-	if status.err != nil {
-		return fmt.Errorf("failed to write file %q: %w", status.workingFilename, status.err)
+	if s.activeFile.err != nil {
+		return fmt.Errorf("failed to write file %q: %w", s.activeFile.workingFilename, s.activeFile.err)
 	}
 	return nil
 }
@@ -131,6 +130,7 @@ func (s *DStoreIO) launchWriter(file *activeFile, reader io.Reader) {
 		s.zlogger.Info("uploaded", zap.String("workingFilename", file.workingFilename), zap.Duration("elapsed", time.Since(t0)))
 	}
 	file.err = err
+	s.activeFile = file
 
-	s.fileStatus <- file
+	s.fileStatus <- true
 }
