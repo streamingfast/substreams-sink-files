@@ -103,11 +103,11 @@ func (s *DStoreIO) Upload(ctx context.Context) error {
 	if err := s.outputStore.PushLocalFile(ctx, s.activeFile.workingFilename, s.activeFile.outputFilename); err != nil {
 		return fmt.Errorf("copy file from worling output: %w", err)
 	}
-	s.activeFile = nil
 	s.zlogger.Info("working file successfully copied to output store",
 		zap.String("output_path", s.activeFile.outputFilename),
 		zap.String("working_path", s.activeFile.workingFilename),
 	)
+	s.activeFile = nil
 	return nil
 }
 
