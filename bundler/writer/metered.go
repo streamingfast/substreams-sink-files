@@ -50,6 +50,15 @@ func (m *Metered) CloseBoundary(ctx context.Context) error {
 	}
 	m.stats.stopUploading()
 
-	m.zlogger.Info("bundler stats", zap.Object("stats", m.stats), zap.Stringer("boundary", m.b))
+	m.zlogger.Info("bundler stats",
+		zap.Float64("avg_upload_sec", m.stats.uploadingTime.Average()),
+		zap.Float64("total_upload_sec", m.stats.uploadingTime.Total()),
+		zap.Duration("last_upload_sec", m.stats.lastUploadTime),
+		zap.Float64("avg_creation_sec", m.stats.creationTime.Average()),
+		zap.Float64("total_creation_sec", m.stats.creationTime.Total()),
+		zap.Duration("last_creation_sec", m.stats.lastCreationTime),
+		zap.Uint64("file_count", m.stats.fileCount),
+		zap.Stringer("boundary", m.b),
+	)
 	return nil
 }
