@@ -9,6 +9,7 @@ import (
 type Metered struct {
 	w       Writer
 	stats   *stats
+	b       *bstream.Range
 	zlogger *zap.Logger
 }
 
@@ -32,6 +33,7 @@ func (m *Metered) StartBoundary(b *bstream.Range) error {
 	if err := m.w.StartBoundary(b); err != nil {
 		return err
 	}
+	m.b = b
 	m.stats.startCollecting()
 	return nil
 }
@@ -48,6 +50,6 @@ func (m *Metered) CloseBoundary(ctx context.Context) error {
 	}
 	m.stats.stopUploading()
 
-	m.zlogger.Info("bundler stats", zap.Object("stats", m.stats))
+	m.zlogger.Info("bundler stats", zap.Object("stats", m.stats), zap.Stringer("boundary", m.b))
 	return nil
 }
