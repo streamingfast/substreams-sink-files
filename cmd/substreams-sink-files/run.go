@@ -31,7 +31,7 @@ var SyncRunCmd = Command(syncRunE,
 		flags.BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 		flags.BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
-		flags.String("boundary-writer-type", "local_file", "Set which boundary writer to use options are: 'local_file','in_memory','noop'")
+		flags.String("boundary-writer-type", "local_file", "Set which boundary writer to use options are: 'local_file','in_memory','noop','buf_local_file'")
 	}),
 	ExamplePrefixed("substreams-sink-files run",
 		"mainnet.eth.streaminfast.io:443 substreams.spkg map_transfers '.transfers[]' ./localdata",

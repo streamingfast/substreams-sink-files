@@ -41,6 +41,8 @@ func (c *Config) getBoundaryWriter(zlogger *zap.Logger) (writer.Writer, error) {
 	switch c.BoundaryWriterType {
 	case "local_file":
 		w = writer.NewDStoreIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
+	case "buf_local_file":
+		w = writer.NewBufferedIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
 	case "in_memory":
 		w = writer.NewMem(c.FileOutputStore, fileType, zlogger)
 	case "noop":
