@@ -50,7 +50,6 @@ func (s *boundaryStats) endBoundary() {
 	s.avgBoundaryProcessDuration.AddDuration(dur)
 	s.boundaryProcessTime = dur
 	s.avgDataProcessDuration.AddDuration(s.procesingDataTime)
-	s.procesingDataTime = 0
 }
 
 func (s *boundaryStats) addProcessingDataDur(dur time.Duration) {

@@ -82,6 +82,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		outputModule.hash,
 		fs.handleBlockScopeData,
 		fs.config.ClientConfig,
+		[]pbsubstreams.ForkStep{pbsubstreams.ForkStep_STEP_IRREVERSIBLE},
 		fs.logger,
 		fs.tracer,
 	)

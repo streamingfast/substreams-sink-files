@@ -17,7 +17,7 @@ require (
 	github.com/streamingfast/pq v0.0.0-20221121194429-f73b4c86e80e
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams v0.0.22-0.20221124192438-6ef4954ac865
-	github.com/streamingfast/substreams-sink v0.0.0-20221124211032-c538b1cb0732
+	github.com/streamingfast/substreams-sink v0.0.0-20221130163929-2dcf0a22b379
 	go.uber.org/zap v1.23.0
 )
 
