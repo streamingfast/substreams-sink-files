@@ -3,6 +3,7 @@ package substreams_file_sink
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
@@ -107,7 +108,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		return fmt.Errorf("sink failed: %w", err)
 	}
 
-	//if err := fs.bundler.Stop(ctx); err != nil {
+	//if err := fs.bundler.stop(ctx); err != nil {
 	//	return fmt.Errorf("force stop: %w", err)
 	//}
 	return nil
@@ -123,10 +124,12 @@ func (fs *FileSinker) handleBlockScopeData(ctx context.Context, cursor *sink.Cur
 			continue
 		}
 
+		t0 := time.Now()
 		resolved, err := fs.config.EntitiesQuery.Resolve(output.GetMapOutput().GetValue(), fs.outputModule.descriptor)
 		if err != nil {
 			return fmt.Errorf("failed to resolve entities query: %w", err)
 		}
+		fs.bundler.TrackBlockProcessDuration(time.Since(t0))
 
 		if err := fs.bundler.Write(cursor, resolved); err != nil {
 			return fmt.Errorf("failed to write entities: %w", err)

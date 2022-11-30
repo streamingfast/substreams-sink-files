@@ -12,9 +12,8 @@ import (
 type Mem struct {
 	baseWriter
 
-	activeFilename  string
-	activeFileStats *stats
-	buf             []byte
+	activeFilename string
+	buf            []byte
 }
 
 func NewMem(

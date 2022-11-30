@@ -34,7 +34,7 @@ type OutputModule struct {
 	hash       manifest.ModuleHash
 }
 
-func (c *Config) getBoundaryWriter(zlogger *zap.Logger) (*writer.Metered, error) {
+func (c *Config) getBoundaryWriter(zlogger *zap.Logger) (writer.Writer, error) {
 	fileType := writer.FileTypeJSONL
 
 	var w writer.Writer
@@ -48,7 +48,7 @@ func (c *Config) getBoundaryWriter(zlogger *zap.Logger) (*writer.Metered, error)
 	default:
 		return nil, fmt.Errorf("unknown boundary writer: %s", c.BoundaryWriterType)
 	}
-	return writer.NewMeteredWriter(w, zlogger), nil
+	return w, nil
 }
 
 func (c *Config) validateOutputModule() (*OutputModule, error) {

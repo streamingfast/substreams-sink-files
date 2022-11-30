@@ -3,12 +3,13 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"github.com/golang/protobuf/proto"
+	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"os"
 	"path/filepath"
+	"time"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/bstream"
 	sink "github.com/streamingfast/substreams-sink"
 	"go.uber.org/zap"
@@ -18,7 +19,8 @@ type Bundler struct {
 	blockCount uint64
 	encoder    Encoder
 
-	boundaryWriter *writer.Metered
+	stats          *boundaryStats
+	boundaryWriter writer.Writer
 	stateStore     *StateStore
 	fileType       writer.FileType
 	activeBoundary *bstream.Range
@@ -28,7 +30,7 @@ type Bundler struct {
 func New(
 	stateFilePath string,
 	size uint64,
-	boundaryWriter *writer.Metered,
+	boundaryWriter writer.Writer,
 	zlogger *zap.Logger,
 ) (*Bundler, error) {
 	stateFileDirectory := filepath.Dir(stateFilePath)
@@ -45,6 +47,7 @@ func New(
 		boundaryWriter: boundaryWriter,
 		stateStore:     stateStore,
 		blockCount:     size,
+		stats:          newStats(),
 		zlogger:        zlogger,
 	}
 
@@ -61,42 +64,11 @@ func (b *Bundler) GetCursor() (*sink.Cursor, error) {
 	return b.stateStore.Read()
 }
 
-func (b *Bundler) Start(blockNum uint64) error {
-	boundaryRange := b.newBoundary(blockNum)
-	b.activeBoundary = boundaryRange
-
-	b.zlogger.Info("starting new file boundary", zap.Stringer("boundary", boundaryRange))
-	if err := b.boundaryWriter.StartBoundary(boundaryRange); err != nil {
-		return fmt.Errorf("start file: %w", err)
-	}
-
-	b.zlogger.Info("boundary started", zap.Stringer("boundary", boundaryRange))
-	b.stateStore.newBoundary(boundaryRange)
-	return nil
-}
-
-func (b *Bundler) Stop(ctx context.Context) error {
-	b.zlogger.Info("stopping file boundary")
-
-	if err := b.boundaryWriter.CloseBoundary(ctx); err != nil {
-		return fmt.Errorf("closing file: %w", err)
-	}
-
-	if err := b.stateStore.Save(); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
-	}
-
-	b.activeBoundary = nil
-	return nil
-}
-
 func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 	if b.activeBoundary.Contains(blockNum) {
 		return nil
 	}
 
-	//0 - 100
-	// 563
 	boundaries := boundariesToSkip(b.activeBoundary, blockNum, b.blockCount)
 
 	b.zlogger.Info("block_num is not in active boundary",
@@ -105,7 +77,7 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 		zap.Uint64("block_num", blockNum),
 	)
 
-	if err := b.Stop(ctx); err != nil {
+	if err := b.stop(ctx); err != nil {
 		return fmt.Errorf("stop active boundary: %w", err)
 	}
 
@@ -113,7 +85,7 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 		if err := b.Start(boundary.StartBlock()); err != nil {
 			return fmt.Errorf("start skipping boundary: %w", err)
 		}
-		if err := b.Stop(ctx); err != nil {
+		if err := b.stop(ctx); err != nil {
 			return fmt.Errorf("stop skipping boundary: %w", err)
 		}
 	}
@@ -124,9 +96,8 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 	return nil
 }
 
-func (b *Bundler) newBoundary(containingBlockNum uint64) *bstream.Range {
-	startBlock := containingBlockNum - (containingBlockNum % b.blockCount)
-	return bstream.NewRangeExcludingEnd(startBlock, startBlock+b.blockCount)
+func (b *Bundler) TrackBlockProcessDuration(elapsed time.Duration) {
+	b.stats.addProcessingDataDur(elapsed)
 }
 
 func (b *Bundler) Write(cursor *sink.Cursor, entities []*dynamic.Message) error {
@@ -145,6 +116,48 @@ func (b *Bundler) Write(cursor *sink.Cursor, entities []*dynamic.Message) error 
 
 	b.stateStore.setCursor(cursor)
 	return nil
+}
+
+func (b *Bundler) Start(blockNum uint64) error {
+	boundaryRange := b.newBoundary(blockNum)
+	b.activeBoundary = boundaryRange
+
+	b.zlogger.Info("starting new file boundary", zap.Stringer("boundary", boundaryRange))
+	if err := b.boundaryWriter.StartBoundary(boundaryRange); err != nil {
+		return fmt.Errorf("start file: %w", err)
+	}
+
+	b.stats.startBoundary(boundaryRange)
+	b.zlogger.Info("boundary started", zap.Stringer("boundary", boundaryRange))
+	b.stateStore.newBoundary(boundaryRange)
+	return nil
+}
+
+func (b *Bundler) stop(ctx context.Context) error {
+	b.zlogger.Info("stopping file boundary")
+
+	if err := b.boundaryWriter.CloseBoundary(ctx); err != nil {
+		return fmt.Errorf("closing file: %w", err)
+	}
+	t0 := time.Now()
+	if err := b.boundaryWriter.Upload(ctx); err != nil {
+		return err
+	}
+	b.stats.addUploadedDuration(time.Since(t0))
+
+	if err := b.stateStore.Save(); err != nil {
+		return fmt.Errorf("failed to save state: %w", err)
+	}
+	b.activeBoundary = nil
+
+	b.stats.endBoundary()
+	b.zlogger.Info("bundler stats", b.stats.Log()...)
+	return nil
+}
+
+func (b *Bundler) newBoundary(containingBlockNum uint64) *bstream.Range {
+	startBlock := containingBlockNum - (containingBlockNum % b.blockCount)
+	return bstream.NewRangeExcludingEnd(startBlock, startBlock+b.blockCount)
 }
 
 func boundariesToSkip(lastBoundary *bstream.Range, blockNum uint64, size uint64) (out []*bstream.Range) {

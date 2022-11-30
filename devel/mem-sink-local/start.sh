@@ -25,7 +25,7 @@ main() {
   fi
 
   exec $sink run \
-    "--in-memory-writer" \
+    "--boundary-writer-type=in_memory" \
     "--state-store=$output_dir/working/state.yaml" \
     "mainnet.eth.streamingfast.io:443" \
     "gs://staging.dfuseio-global.appspot.com/lidar/spkgs/lidar-yuga-retention-v0.0.2.spkg" \
