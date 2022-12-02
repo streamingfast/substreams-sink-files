@@ -3,8 +3,6 @@ package bundler
 import (
 	"context"
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"os"
 	"path/filepath"
@@ -100,20 +98,10 @@ func (b *Bundler) TrackBlockProcessDuration(elapsed time.Duration) {
 	b.stats.addProcessingDataDur(elapsed)
 }
 
-func (b *Bundler) Write(cursor *sink.Cursor, entities []*dynamic.Message) error {
-	var buf []byte
-	for _, entity := range entities {
-		cnt, err := b.encoder(proto.Message(entity))
-		if err != nil {
-			return fmt.Errorf("failed to encode: %w", err)
-		}
-		buf = append(buf, cnt...)
-	}
-
-	if err := b.boundaryWriter.Write(buf); err != nil {
+func (b *Bundler) Write(cursor *sink.Cursor, data []byte) error {
+	if err := b.boundaryWriter.Write(data); err != nil {
 		return fmt.Errorf("failed to write data: %w", err)
 	}
-
 	b.stateStore.setCursor(cursor)
 	return nil
 }

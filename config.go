@@ -3,12 +3,12 @@ package substreams_file_sink
 import (
 	"fmt"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
+	"github.com/streamingfast/substreams-sink-files/encoder"
 	"go.uber.org/zap"
 	"strings"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/pq"
 	"github.com/streamingfast/substreams/client"
 	"github.com/streamingfast/substreams/manifest"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
@@ -20,12 +20,15 @@ type Config struct {
 	FileOutputStore         dstore.Store
 	BlockRange              string
 	Pkg                     *pbsubstreams.Package
-	EntitiesQuery           *pq.Query
-	OutputModuleName        string
-	ClientConfig            *client.SubstreamsClientConfig
-	BlockPerFile            uint64
+
+	//EntitiesQuery *pq.Query
+
+	OutputModuleName string
+	ClientConfig     *client.SubstreamsClientConfig
+	BlockPerFile     uint64
 
 	BoundaryWriterType string
+	Encoder            string
 }
 
 type OutputModule struct {
@@ -51,6 +54,17 @@ func (c *Config) getBoundaryWriter(zlogger *zap.Logger) (writer.Writer, error) {
 		return nil, fmt.Errorf("unknown boundary writer: %s", c.BoundaryWriterType)
 	}
 	return w, nil
+}
+
+func (c *Config) getEncoder(out *OutputModule) (encoder.Encoder, error) {
+	if c.Encoder == "lines" {
+		return encoder.NewLineEncoder(), nil
+	} else if strings.HasPrefix(c.Encoder, "proto:") {
+		protoFiledPath := strings.Replace(c.Encoder, "proto:", "", 1)
+		return encoder.NewProtoToJson(protoFiledPath, out.descriptor)
+	} else {
+		return nil, fmt.Errorf("unknonw encoder type %q", c.Encoder)
+	}
 }
 
 func (c *Config) validateOutputModule() (*OutputModule, error) {
