@@ -31,6 +31,17 @@ var SyncRunCmd = Command(syncRunE,
 		flags.BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
 		flags.String("encoder", "", "Sets which encoder to use to parse the Substreams Output Module data. Options are: 'lines', 'proto:<_proto_path_to_field>'")
+		flags.Uint64("buffer-max-size", 64*1024*1024, FlagDescription(`
+			Amount of memory bytes to allocate to the buffered writer. If your data set is small enough that every is hold in memory, we are going to avoid
+			the local I/O operation(s) and upload accumulated content in memory directly to final storage location.
+
+			Ideally, you should set this as to about 80%% of RAM the process has access to. This will maximize amout of element in memory,
+			and reduce 'syscall' and I/O operations to write to the temporary file as we are buffering a lot of data.
+
+			This setting has probably the greatest impact on writting throughput.
+
+			Default value for the buffer is 64 MiB.
+		`))
 		flags.String("boundary-writer-type", "local_file", "Set which boundary writer to use options are: 'local_file','in_memory','noop','buf_local_file'")
 	}),
 	ExamplePrefixed("substreams-sink-files run",
@@ -61,6 +72,8 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	fileWorkingDir := viper.GetString("run-file-working-dir")
 	stateStorePath := viper.GetString("run-state-store")
 	blocksPerFile := viper.GetUint64("run-file-block-count")
+	bufferMaxSize := viper.GetUint64("run-buffer-max-size")
+
 	boundaryWriterType := viper.GetString("run-boundary-writer-type")
 	encoder := viper.GetString("run-encoder")
 	zlog.Info("sink to files",
@@ -73,6 +86,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		zap.String("block_range", blockRange),
 		zap.String("state_store", stateStorePath),
 		zap.Uint64("blocks_per_file", blocksPerFile),
+		zap.Uint64("buffer_max_size", bufferMaxSize),
 		zap.String("boundary_writer", boundaryWriterType),
 	)
 
@@ -98,6 +112,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		Encoder:                 encoder,
 		OutputModuleName:        outputModuleName,
 		BlockPerFile:            blocksPerFile,
+		BufferMazSize:           bufferMaxSize,
 		BoundaryWriterType:      boundaryWriterType,
 		ClientConfig: client.NewSubstreamsClientConfig(
 			endpoint,

@@ -2,49 +2,41 @@ package writer
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
-	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
-	"go.uber.org/zap"
 	"io"
 	"os"
 	"path/filepath"
-	"time"
-)
 
-const (
-	DefaultBufSize = 1 * 1024 * 1024 // 1 MB
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dstore"
+	"go.uber.org/zap"
 )
-
-type bufferedActiveFile struct {
-	pipeWriter      *io.PipeWriter
-	writer          *bufio.Writer
-	fileWriter      io.Writer
-	blockRange      *bstream.Range
-	workingFilename string
-	outputFilename  string
-	err             error
-}
 
 type BufferedIO struct {
 	baseWriter
 
-	workingDir string
-	activeFile *bufferedActiveFile
-	fileStatus chan bool
+	bufferMazSize uint64
+	workingDir    string
+	activeFile    *bufferedActiveFile
 }
 
 func NewBufferedIO(
+	bufferMaxSize uint64,
 	workingDir string,
 	outputStore dstore.Store,
 	fileType FileType,
 	zlogger *zap.Logger,
-) Writer {
-	return &DStoreIO{
-		baseWriter: newBaseWriter(outputStore, fileType, zlogger),
-		workingDir: workingDir,
-		fileStatus: make(chan bool, 1),
+) *BufferedIO {
+	if bufferMaxSize == 0 {
+		bufferMaxSize = DefaultBufSize
+	}
+
+	return &BufferedIO{
+		bufferMazSize: bufferMaxSize,
+		baseWriter:    newBaseWriter(outputStore, fileType, zlogger),
+		workingDir:    workingDir,
 	}
 }
 
@@ -54,33 +46,19 @@ func (s *BufferedIO) workingFilename(blockRange *bstream.Range) string {
 
 func (s *BufferedIO) StartBoundary(blockRange *bstream.Range) error {
 	if s.activeFile != nil {
-		return fmt.Errorf("unable to start a file while one %q is open", s.activeFile.workingFilename)
+		return fmt.Errorf("unable to start a file while one (backed by %q) is already open", s.activeFile.Path())
 	}
 
-	if err := os.MkdirAll(s.workingDir, os.ModePerm); err != nil {
-		return fmt.Errorf("unable to create working directories: %w", err)
-	}
-
-	workingFilename := filepath.Join(s.workingDir, s.workingFilename(blockRange))
-	fileWriter, err := os.Create(workingFilename)
-	if err != nil {
-		return fmt.Errorf("unable to create working file %q: %w", workingFilename, err)
-	}
-
-	pr, pw := io.Pipe()
+	lazyFile := LazyOpen(filepath.Join(s.workingDir, s.workingFilename(blockRange)))
 
 	a := &bufferedActiveFile{
-		pipeWriter:      pw,
-		writer:          bufio.NewWriterSize(pw, DefaultBufSize),
-		blockRange:      blockRange,
-		fileWriter:      fileWriter,
-		workingFilename: workingFilename,
-		outputFilename:  s.filename(blockRange),
+		lazyFile:       lazyFile,
+		writer:         NewIntelligentWriterSize(lazyFile, int(s.bufferMazSize)),
+		blockRange:     blockRange,
+		outputFilename: s.filename(blockRange),
 	}
 
-	go s.launchWriter(a, pr)
 	s.activeFile = a
-
 	return nil
 }
 
@@ -88,35 +66,46 @@ func (s *BufferedIO) CloseBoundary(ctx context.Context) error {
 	if s.activeFile == nil {
 		return fmt.Errorf("no active file")
 	}
+
+	if s.activeFile.writer.AllDataFitInMemory() {
+		s.zlogger.Info("all data from range is in memory, no need to flush")
+		return nil
+	}
+
 	s.zlogger.Info("flushing buffered writter")
 	if err := s.activeFile.writer.Flush(); err != nil {
 		return fmt.Errorf("flushing buffered active writer: %w", err)
 	}
 
-	if err := s.activeFile.pipeWriter.Close(); err != nil {
-		return fmt.Errorf("closing pipe writer: %w", err)
+	if err := s.activeFile.lazyFile.Close(); err != nil {
+		return fmt.Errorf("closing file: %w", err)
 	}
 
-	select {
-	case _ = <-s.fileStatus:
-	case <-ctx.Done():
-		return fmt.Errorf("context completed")
-	}
-
-	if s.activeFile.err != nil {
-		return fmt.Errorf("failed to write file %q: %w", s.activeFile.workingFilename, s.activeFile.err)
-	}
 	return nil
 }
 
 func (s *BufferedIO) Upload(ctx context.Context) error {
-	if err := s.outputStore.PushLocalFile(ctx, s.activeFile.workingFilename, s.activeFile.outputFilename); err != nil {
-		return fmt.Errorf("copy file from worling output: %w", err)
+	var logFields []zap.Field
+	if s.activeFile.writer.AllDataFitInMemory() {
+		logFields = append(logFields, zap.String("from", "memory"))
+
+		reader := bytes.NewReader(s.activeFile.writer.MemoryData())
+		if err := s.outputStore.WriteObject(ctx, s.activeFile.outputFilename, reader); err != nil {
+			return fmt.Errorf("write object: %w", err)
+		}
+	} else {
+		workingPath := s.activeFile.Path()
+		logFields = append(logFields, zap.String("from", "file"), zap.String("working_path", workingPath))
+
+		// PushLocalFile actually removes the file once uploaded
+		if err := s.outputStore.PushLocalFile(ctx, workingPath, s.activeFile.outputFilename); err != nil {
+			return fmt.Errorf("copy file from worling output: %w", err)
+		}
 	}
-	s.zlogger.Info("working file successfully copied to output store",
-		zap.String("output_path", s.activeFile.outputFilename),
-		zap.String("working_path", s.activeFile.workingFilename),
-	)
+
+	logFields = append(logFields, zap.String("output_path", s.activeFile.outputFilename))
+	s.zlogger.Info("working file successfully copied to output store", logFields...)
+
 	s.activeFile = nil
 	return nil
 }
@@ -131,16 +120,167 @@ func (s *BufferedIO) Write(data []byte) error {
 	return nil
 }
 
-func (s *BufferedIO) launchWriter(file *bufferedActiveFile, reader io.Reader) {
-	t0 := time.Now()
-	_, err := io.Copy(file.fileWriter, reader)
-	if err != nil {
-		s.zlogger.Warn("failed to upload file", zap.Error(err), zap.Duration("elapsed", time.Since(t0)))
-	} else {
-		s.zlogger.Info("uploaded", zap.String("workingFilename", file.workingFilename), zap.Duration("elapsed", time.Since(t0)))
-	}
-	file.err = err
-	s.activeFile = file
+var _ io.WriteCloser = (*LazyFile)(nil)
 
-	s.fileStatus <- true
+// LazyFile only creates and writes to file if `Write` is called at least one.
+//
+// **Important** Not safe for concurrent access, you need to gate yourself if
+// you need that.
+type LazyFile struct {
+	*os.File
+
+	path string
+}
+
+func LazyOpen(path string) *LazyFile {
+	return &LazyFile{
+		File: nil,
+		path: path,
+	}
+}
+
+func (f *LazyFile) Path() string {
+	return f.path
+}
+
+func (f *LazyFile) Write(p []byte) (n int, err error) {
+	if f.File == nil {
+		if err := os.MkdirAll(filepath.Dir(f.path), os.ModePerm); err != nil {
+			return 0, fmt.Errorf("mkdir dirs: %w", err)
+		}
+
+		file, err := os.Create(f.path)
+		if err != nil {
+			return 0, fmt.Errorf("open file: %w", err)
+		}
+
+		f.File = file
+	}
+
+	return f.File.Write(p)
+}
+
+func (f *LazyFile) Close() error {
+	if f.File != nil {
+		return f.File.Close()
+	}
+
+	return nil
+}
+
+// memoryBufferedWriter has two goals. First, it knows if wrapped writer received
+// data or not. When no data has been receveid, it's possible to use this writer
+// to retrieve the content being written to it to a memory buffer.
+//
+// In expected case where we are controlled by an IntelligentWriter, no memory allocation
+// will happen as the IntelligentWriter uses a `bufio.Writer` and we will receive it's internal
+// buffer.
+type memoryBufferedWriter struct {
+	io.Writer
+
+	MemoryBuffer       []byte
+	NextWritesToMemory bool
+	WrittenToWrapped   bool
+}
+
+func newMemoryBufferedWriter(w io.Writer) *memoryBufferedWriter {
+	return &memoryBufferedWriter{Writer: w}
+}
+
+func (f *memoryBufferedWriter) Write(p []byte) (n int, err error) {
+	if f.NextWritesToMemory {
+		if f.MemoryBuffer == nil {
+			f.MemoryBuffer = p
+			return len(p), nil
+		}
+
+		f.MemoryBuffer = append(f.MemoryBuffer, p...)
+		return len(p), nil
+	}
+
+	f.WrittenToWrapped = true
+	return f.Writer.Write(p)
+}
+
+func (f *memoryBufferedWriter) Close() error {
+	if v, ok := f.Writer.(io.Closer); ok {
+		return v.Close()
+	}
+
+	return nil
+}
+
+// NewIntelligentWriterSize is intelligent because it tracks if data was ever
+// written to the temporary file or not. If everything entered the buffer fit in memory,
+// we can nicely optimze away the full I/O operation and avoid all the cost of it.
+//
+// Operators should specify a buffer as large as they are willing to pay for RAM (
+// leaving a buffer for "normal" operations of the process).
+func NewIntelligentWriterSize(w io.Writer, size int) *IntelligentWriter {
+	underlyingWritter := newMemoryBufferedWriter(w)
+
+	return &IntelligentWriter{Writer: bufio.NewWriterSize(underlyingWritter, size), underlyingWritter: underlyingWritter}
+}
+
+// NewIntelligentWriter returns a new IntelligentWriter whose buffer has the default size.
+// If the argument io.Writer is already a bufio.Writer with large enough buffer size,
+// it returns the underlying Writer.
+func NewIntelligentWriter(w io.Writer) *IntelligentWriter {
+	return NewIntelligentWriterSize(w, DefaultBufSize)
+}
+
+func (w *IntelligentWriter) AllDataFitInMemory() bool {
+	return !w.underlyingWritter.WrittenToWrapped
+}
+
+func (w *IntelligentWriter) MemoryData() []byte {
+	if !w.AllDataFitInMemory() {
+		panic(fmt.Errorf("it's invalid to call MemoryData without checking if all data is held in memory, check AllDataFitInMemory prior calling this method"))
+	}
+
+	// It's a bit convoluated here because `bufio.Writer` does not give
+	// direct access to underlying buffer. So we need to make some weird
+	// steps to access the buffered data without an allocation.
+	//
+	// The trick here is to use `Flush` primitive, we know the data is fully
+	// in memory at this point. Implemented of `Flush` on `bufio.Writer` calls
+	// the wrapped writer directly with the unaccessible buffer like `writ.Write(b.buf[0:n])`
+	// where `n` is amount of data buffered (all in your case). It passes this buffer
+	// straight to `writ` instance.
+	//
+	// We thus have now our `memoryBufferedWriter` struct which we will switch its mode
+	// to now record everything in memory.
+	w.underlyingWritter.NextWritesToMemory = true
+
+	// And we call `Flush` which triggers the `writ.Write(b.buf[0:n])` and which will reach
+	// our `memoryBufferedWriter` which itself will keep a reference to `b.buf[0:n]`.
+	if err := w.Writer.Flush(); err != nil {
+		panic(fmt.Errorf("this should have been infallible because we write directly received 'b.buf[0:n]', there is a flaw in our logic: %w", err))
+	}
+
+	return w.underlyingWritter.MemoryBuffer
+}
+
+type IntelligentWriter struct {
+	*bufio.Writer
+
+	underlyingWritter *memoryBufferedWriter
+}
+
+const (
+	DefaultBufSize = 16 * 1024 * 1024 // 16 MiB
+)
+
+type bufferedActiveFile struct {
+	lazyFile *LazyFile
+	writer   *IntelligentWriter
+	// fileWriter      io.Writer
+	blockRange *bstream.Range
+	// workingFilename string
+	outputFilename string
+	// err             error
+}
+
+func (f *bufferedActiveFile) Path() string {
+	return f.lazyFile.path
 }

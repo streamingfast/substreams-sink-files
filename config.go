@@ -2,10 +2,11 @@ package substreams_file_sink
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/encoder"
 	"go.uber.org/zap"
-	"strings"
 
 	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/dstore"
@@ -27,6 +28,7 @@ type Config struct {
 	ClientConfig     *client.SubstreamsClientConfig
 	BlockPerFile     uint64
 
+	BufferMazSize      uint64
 	BoundaryWriterType string
 	Encoder            string
 }
@@ -45,7 +47,7 @@ func (c *Config) getBoundaryWriter(zlogger *zap.Logger) (writer.Writer, error) {
 	case "local_file":
 		w = writer.NewDStoreIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
 	case "buf_local_file":
-		w = writer.NewBufferedIO(c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
+		w = writer.NewBufferedIO(c.BufferMazSize, c.FileWorkingDir, c.FileOutputStore, fileType, zlogger)
 	case "in_memory":
 		w = writer.NewMem(c.FileOutputStore, fileType, zlogger)
 	case "noop":
