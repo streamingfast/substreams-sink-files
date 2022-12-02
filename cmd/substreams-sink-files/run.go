@@ -11,7 +11,6 @@ import (
 	. "github.com/streamingfast/cli"
 	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/pq"
 	"github.com/streamingfast/shutter"
 	substreamsfile "github.com/streamingfast/substreams-sink-files"
 	"github.com/streamingfast/substreams/client"
@@ -24,13 +23,14 @@ import (
 var SyncRunCmd = Command(syncRunE,
 	"run <endpoint> <manifest> <module> <path> <output_store> [<start>:<stop>]",
 	"Runs extractor code",
-	RangeArgs(5, 6),
+	RangeArgs(4, 5),
 	Flags(func(flags *pflag.FlagSet) {
 		flags.String("file-working-dir", "./localdata/working", "Working store where we accumulate data")
 		flags.String("state-store", "./state.yaml", "Output path where to store latest received cursor, if empty, cursor will not be persisted")
 		flags.BoolP("insecure", "k", false, "Skip certificate validation on GRPC connection")
 		flags.BoolP("plaintext", "p", false, "Establish GRPC connection in plaintext")
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
+		flags.String("encoder", "", "Sets which encoder to use to parse the Substreams Output Module data. Options are: 'lines', 'proto:<_proto_path_to_field>'")
 		flags.String("boundary-writer-type", "local_file", "Set which boundary writer to use options are: 'local_file','in_memory','noop','buf_local_file'")
 	}),
 	ExamplePrefixed("substreams-sink-files run",
@@ -52,22 +52,22 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	endpoint := args[0]
 	manifestPath := args[1]
 	outputModuleName := args[2]
-	entitiesPath := args[3]
-	fileOutputPath := args[4]
+	fileOutputPath := args[3]
 	blockRange := ""
-	if len(args) > 5 {
-		blockRange = args[5]
+	if len(args) > 4 {
+		blockRange = args[4]
 	}
 
 	fileWorkingDir := viper.GetString("run-file-working-dir")
 	stateStorePath := viper.GetString("run-state-store")
 	blocksPerFile := viper.GetUint64("run-file-block-count")
 	boundaryWriterType := viper.GetString("run-boundary-writer-type")
+	encoder := viper.GetString("run-encoder")
 	zlog.Info("sink to files",
 		zap.String("file_output_path", fileOutputPath),
 		zap.String("file_working_dir", fileWorkingDir),
 		zap.String("endpoint", endpoint),
-		zap.String("entities_path", entitiesPath),
+		zap.String("encoder", encoder),
 		zap.String("manifest_path", manifestPath),
 		zap.String("output_module_name", outputModuleName),
 		zap.String("block_range", blockRange),
@@ -75,11 +75,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		zap.Uint64("blocks_per_file", blocksPerFile),
 		zap.String("boundary_writer", boundaryWriterType),
 	)
-
-	entitiesQuery, err := pq.Parse(entitiesPath)
-	if err != nil {
-		return fmt.Errorf("parse entities path %q: %w", fileOutputPath, err)
-	}
 
 	fileOutputStore, err := dstore.NewStore(fileOutputPath, "", "", false)
 	if err != nil {
@@ -100,7 +95,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		FileWorkingDir:          fileWorkingDir,
 		BlockRange:              blockRange,
 		Pkg:                     pkg,
-		EntitiesQuery:           entitiesQuery,
+		Encoder:                 encoder,
 		OutputModuleName:        outputModuleName,
 		BlockPerFile:            blocksPerFile,
 		BoundaryWriterType:      boundaryWriterType,

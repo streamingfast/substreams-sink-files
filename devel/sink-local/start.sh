@@ -25,12 +25,12 @@ main() {
   fi
 
   exec $sink run \
-    "--file-working-dir=$output_dir/working" \
+    "--boundary-writer-type=in_memory" \
+    "--encoder=lines" \
     "--state-store=$output_dir/working/state.yaml" \
     "mainnet.eth.streamingfast.io:443" \
-    "gs://staging.dfuseio-global.appspot.com/lidar/spkgs/lidar-yuga-retention-v0.0.2.spkg" \
-    "map_transfers" \
-    ".transfers[]" \
+    "gs://staging.dfuseio-global.appspot.com/substreams/eth-token-transfers/spkg/substreams-v0.3.0.spkg" \
+    "map_json_transfers" \
     "$output_dir/out" \
     "$@"
 }

@@ -3,6 +3,7 @@ package substreams_file_sink
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams-sink-files/encoder"
 	"time"
 
 	"github.com/streamingfast/logging"
@@ -19,16 +20,14 @@ func RegisterMetrics() {
 
 type FileSinker struct {
 	*shutter.Shutter
-	config       *Config
-	outputModule *OutputModule
+	config *Config
 
 	bundler *bundler.Bundler
+	sink    *sink.Sinker
 
-	//stateStore   *bundler.StateStore
-	sink *sink.Sinker
-
-	logger *zap.Logger
-	tracer logging.Tracer
+	logger  *zap.Logger
+	tracer  logging.Tracer
+	encoder encoder.Encoder
 }
 
 func NewFileSinker(config *Config, logger *zap.Logger, tracer logging.Tracer) *FileSinker {
@@ -46,8 +45,6 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("invalid output module: %w", err)
 	}
-
-	fs.outputModule = outputModule
 
 	blockRange, err := resolveBlockRange(fs.config.BlockRange, outputModule.module)
 	if err != nil {
@@ -67,6 +64,13 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("new bunlder: %w", err)
 	}
+
+	encoder, err := fs.config.getEncoder(outputModule)
+	if err != nil {
+		return fmt.Errorf("failed to create encoder: %w", err)
+	}
+
+	fs.encoder = encoder
 
 	cursor, err := fs.bundler.GetCursor()
 	if err != nil {
@@ -126,13 +130,13 @@ func (fs *FileSinker) handleBlockScopeData(ctx context.Context, cursor *sink.Cur
 		}
 
 		t0 := time.Now()
-		resolved, err := fs.config.EntitiesQuery.Resolve(output.GetMapOutput().GetValue(), fs.outputModule.descriptor)
+		data, err := fs.encoder.Encode(output)
 		if err != nil {
 			return fmt.Errorf("failed to resolve entities query: %w", err)
 		}
 		fs.bundler.TrackBlockProcessDuration(time.Since(t0))
 
-		if err := fs.bundler.Write(cursor, resolved); err != nil {
+		if err := fs.bundler.Write(cursor, data); err != nil {
 			return fmt.Errorf("failed to write entities: %w", err)
 		}
 	}
