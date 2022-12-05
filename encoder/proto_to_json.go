@@ -26,7 +26,6 @@ func NewProtoToJson(fiedPath string, outputModuleDesc *desc.MessageDescriptor) (
 }
 
 func (p *ProtoToJson) EncodeTo(output *pbsubstreams.ModuleOutput, writer writer.Writer) error {
-	fmt.Println("Typeurl", output.GetMapOutput().TypeUrl)
 	entities, err := p.querier.Resolve(output.GetMapOutput().GetValue(), p.outputModuleDesc)
 	if err != nil {
 		return fmt.Errorf("failed to resolve entities query: %w", err)
