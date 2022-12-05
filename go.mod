@@ -22,7 +22,10 @@ require (
 	go.uber.org/zap v1.23.0
 )
 
-require github.com/cenkalti/backoff/v4 v4.1.3 // indirect
+require (
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
+	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2 // indirect
+)
 
 require (
 	cloud.google.com/go v0.104.0 // indirect

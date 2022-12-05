@@ -52,19 +52,21 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 		return fmt.Errorf("resolve block range: %w", err)
 	}
 
-	writer, err := fs.config.getBoundaryWriter(fs.logger)
-	if err != nil {
-		return fmt.Errorf("unable to get boundary writer: %w", err)
-	}
 	fs.bundler, err = bundler.New(
 		fs.config.SubstreamStateStorePath,
 		fs.config.BlockPerFile,
-		writer,
+		fs.config.getBoundaryWriter(fs.logger),
+		fs.config.FileOutputStore,
 		fs.logger,
 	)
 	if err != nil {
 		return fmt.Errorf("new bunlder: %w", err)
 	}
+	fs.OnTerminating(func(err error) {
+		fs.logger.Info("file sinker terminating, closing bundle", zap.Error(err))
+		fs.bundler.Close()
+	})
+	fs.bundler.Launch(ctx)
 
 	encoder, err := fs.config.getEncoder(outputModule)
 	if err != nil {

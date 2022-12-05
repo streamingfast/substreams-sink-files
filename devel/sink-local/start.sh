@@ -25,7 +25,6 @@ main() {
   fi
 
   exec $sink run \
-    "--boundary-writer-type=in_memory" \
     "--encoder=lines" \
     "--state-store=$output_dir/working/state.yaml" \
     "${SUBSTREAMS_ENDPOINT:-"mainnet.eth.streamingfast.io:443"}" \

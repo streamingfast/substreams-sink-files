@@ -63,13 +63,24 @@ func (s *StateStore) setCursor(cursor *sink.Cursor) {
 	}
 }
 
-func (s *StateStore) Save() error {
-	content, err := yaml.Marshal(s.state)
+func (s *StateStore) Encode() (*stateInstance, error) {
+	cnt, err := yaml.Marshal(s.state)
 	if err != nil {
-		return fmt.Errorf("unable to marshal state: %w", err)
+		return nil, fmt.Errorf("marshall: %w", err)
 	}
+	return &stateInstance{
+		data: cnt,
+		path: s.outputPath,
+	}, nil
+}
 
-	if err := os.WriteFile(s.outputPath, content, os.ModePerm); err != nil {
+type stateInstance struct {
+	data []byte
+	path string
+}
+
+func (s *stateInstance) Save() error {
+	if err := os.WriteFile(s.path, s.data, os.ModePerm); err != nil {
 		return fmt.Errorf("unable to write state file: %w", err)
 	}
 	return nil

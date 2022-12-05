@@ -3,6 +3,8 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/dhammer"
+	"github.com/streamingfast/dstore"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,14 +17,15 @@ import (
 )
 
 type Bundler struct {
-	blockCount uint64
-	encoder    Encoder
-
+	blockCount     uint64
+	encoder        Encoder
 	stats          *boundaryStats
 	boundaryWriter writer.Writer
+	outputStore    dstore.Store
 	stateStore     *StateStore
 	fileType       writer.FileType
 	activeBoundary *bstream.Range
+	uploadQueue    *dhammer.Nailer
 	zlogger        *zap.Logger
 }
 
@@ -30,6 +33,7 @@ func New(
 	stateFilePath string,
 	size uint64,
 	boundaryWriter writer.Writer,
+	outputStore dstore.Store,
 	zlogger *zap.Logger,
 ) (*Bundler, error) {
 	stateFileDirectory := filepath.Dir(stateFilePath)
@@ -41,14 +45,16 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("load state store: %w", err)
 	}
-
 	b := &Bundler{
 		boundaryWriter: boundaryWriter,
 		stateStore:     stateStore,
+		outputStore:    outputStore,
 		blockCount:     size,
 		stats:          newStats(),
 		zlogger:        zlogger,
 	}
+
+	b.uploadQueue = dhammer.NewNailer(5, b.uploadBoundary, dhammer.NailerLogger(zlogger))
 
 	switch boundaryWriter.Type() {
 	case writer.FileTypeJSONL:
@@ -57,6 +63,36 @@ func New(
 		return nil, fmt.Errorf("invalid file type %q", boundaryWriter.Type())
 	}
 	return b, nil
+}
+
+func (b *Bundler) Launch(ctx context.Context) {
+	b.uploadQueue.Start(ctx)
+	go func() {
+		for v := range b.uploadQueue.Out {
+			bf := v.(*boundaryFile)
+
+			if err := bf.state.Save(); err != nil {
+				b.zlogger.Warn("unable to save state",
+					zap.Error(err),
+					zap.String("d", bf.state.path),
+				)
+				return
+			}
+		}
+		if b.uploadQueue.Err() != nil {
+			b.zlogger.Warn("queue error",
+				zap.Error(b.uploadQueue.Err()),
+			)
+		}
+	}()
+}
+
+func (b *Bundler) Close() {
+	b.zlogger.Info("closing upload queue")
+	b.uploadQueue.Close()
+	b.zlogger.Info("waiting till queue is drained")
+	b.uploadQueue.WaitUntilEmpty(context.Background())
+	b.zlogger.Info("boundary uploaded completed")
 }
 
 func (b *Bundler) GetCursor() (*sink.Cursor, error) {
@@ -125,18 +161,25 @@ func (b *Bundler) Start(blockNum uint64) error {
 func (b *Bundler) stop(ctx context.Context) error {
 	b.zlogger.Info("stopping file boundary")
 
-	if err := b.boundaryWriter.CloseBoundary(ctx); err != nil {
+	file, err := b.boundaryWriter.CloseBoundary(ctx)
+	if err != nil {
 		return fmt.Errorf("closing file: %w", err)
 	}
-	t0 := time.Now()
-	if err := b.boundaryWriter.Upload(ctx); err != nil {
-		return err
-	}
-	b.stats.addUploadedDuration(time.Since(t0))
 
-	if err := b.stateStore.Save(); err != nil {
-		return fmt.Errorf("failed to save state: %w", err)
+	state, err := b.stateStore.Encode()
+	if err != nil {
+		return fmt.Errorf("failed to encode state: %w", err)
 	}
+
+	b.zlogger.Info("queuing boundary upload",
+		zap.Stringer("boundary", b.activeBoundary),
+	)
+	b.uploadQueue.In <- &boundaryFile{
+		name:  b.activeBoundary.String(),
+		file:  file,
+		state: state,
+	}
+
 	b.activeBoundary = nil
 
 	b.stats.endBoundary()
@@ -162,4 +205,25 @@ func boundariesToSkip(lastBoundary *bstream.Range, blockNum uint64, size uint64)
 
 func computeEndBlock(startBlockNum, size uint64) uint64 {
 	return (startBlockNum + size) - (startBlockNum+size)%size
+}
+
+type boundaryFile struct {
+	name  string
+	file  writer.Uploadeable
+	state *stateInstance
+}
+
+func (b *Bundler) uploadBoundary(ctx context.Context, v interface{}) (interface{}, error) {
+	bf := v.(*boundaryFile)
+
+	outputPath, err := bf.file.Upload(ctx, b.outputStore)
+	if err != nil {
+		return nil, fmt.Errorf("unable to upload: %w", err)
+	}
+	b.zlogger.Info("boundary uploaded",
+		zap.String("boundary", bf.name),
+		zap.String("output_path", outputPath),
+	)
+
+	return bf, nil
 }

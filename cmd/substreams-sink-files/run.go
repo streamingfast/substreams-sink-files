@@ -42,7 +42,6 @@ var SyncRunCmd = Command(syncRunE,
 
 			Default value for the buffer is 64 MiB.
 		`))
-		flags.String("boundary-writer-type", "local_file", "Set which boundary writer to use options are: 'local_file','in_memory','noop','buf_local_file'")
 	}),
 	ExamplePrefixed("substreams-sink-files run",
 		"mainnet.eth.streaminfast.io:443 substreams.spkg map_transfers '.transfers[]' ./localdata",
@@ -74,7 +73,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	blocksPerFile := viper.GetUint64("run-file-block-count")
 	bufferMaxSize := viper.GetUint64("run-buffer-max-size")
 
-	boundaryWriterType := viper.GetString("run-boundary-writer-type")
 	encoder := viper.GetString("run-encoder")
 	zlog.Info("sink to files",
 		zap.String("file_output_path", fileOutputPath),
@@ -87,7 +85,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		zap.String("state_store", stateStorePath),
 		zap.Uint64("blocks_per_file", blocksPerFile),
 		zap.Uint64("buffer_max_size", bufferMaxSize),
-		zap.String("boundary_writer", boundaryWriterType),
 	)
 
 	fileOutputStore, err := dstore.NewStore(fileOutputPath, "", "", false)
@@ -113,7 +110,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		OutputModuleName:        outputModuleName,
 		BlockPerFile:            blocksPerFile,
 		BufferMazSize:           bufferMaxSize,
-		BoundaryWriterType:      boundaryWriterType,
 		ClientConfig: client.NewSubstreamsClientConfig(
 			endpoint,
 			apiToken,

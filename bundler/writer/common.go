@@ -3,7 +3,6 @@ package writer
 import (
 	"fmt"
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
 
@@ -14,16 +13,14 @@ const (
 )
 
 type baseWriter struct {
-	outputStore dstore.Store
-	fileType    FileType
-	zlogger     *zap.Logger
+	fileType FileType
+	zlogger  *zap.Logger
 }
 
-func newBaseWriter(outputStore dstore.Store, fileType FileType, zlogger *zap.Logger) baseWriter {
+func newBaseWriter(fileType FileType, zlogger *zap.Logger) baseWriter {
 	return baseWriter{
-		outputStore: outputStore,
-		fileType:    fileType,
-		zlogger:     zlogger,
+		fileType: fileType,
+		zlogger:  zlogger,
 	}
 
 }

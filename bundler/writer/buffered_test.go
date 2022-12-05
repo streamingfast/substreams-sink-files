@@ -49,10 +49,11 @@ func TestNewBufferedIO(t *testing.T) {
 				require.NoError(t, simpler.Write([]byte("{first}")))
 				require.NoError(t, simpler.Write([]byte("{second}")))
 
-				require.NoError(t, writer.CloseBoundary(context.Background()))
+				uploadeable, err := writer.CloseBoundary(context.Background())
+				require.NoError(t, err)
 				writtenFiles := listFiles(workingDir)
 
-				require.NoError(t, writer.Upload(context.Background()))
+				require.NoError(t, uploadeable.Upload(context.Background(), output))
 
 				assert.Len(t, writtenFiles, 0)
 				assert.Equal(t, map[string][]byte{
@@ -71,11 +72,13 @@ func TestNewBufferedIO(t *testing.T) {
 				require.NoError(t, simpler.Write([]byte("{first}")), "write first content")
 				require.NoError(t, simpler.Write([]byte("{second}")), "write second content")
 
-				require.NoError(t, writer.CloseBoundary(context.Background()), "closing boundary")
+				//require.NoError(t, writer.CloseBoundary(context.Background()), "closing boundary")
+				uploadeable, err := writer.CloseBoundary(context.Background())
+				require.NoError(t, err)
 
 				writtenFiles := listFiles(workingDir)
 
-				require.NoError(t, writer.Upload(context.Background()), "upload file")
+				require.NoError(t, uploadeable.Upload(context.Background(), output), "upload file")
 
 				assert.ElementsMatch(t, []string{"/0000000000-0000000010.tmp.jsonl"}, writtenFiles)
 				assert.Equal(t, map[string][]byte{
@@ -89,7 +92,7 @@ func TestNewBufferedIO(t *testing.T) {
 			workingDir := t.TempDir()
 			outputStore := dstore.NewMockStore(nil)
 
-			writer := NewBufferedIO(tt.bufferSize, workingDir, outputStore, FileTypeJSONL, zlog)
+			writer := NewBufferedIO(tt.bufferSize, workingDir, FileTypeJSONL, zlog)
 
 			tt.checks(t, writer, workingDir, outputStore)
 		})

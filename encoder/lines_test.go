@@ -69,7 +69,7 @@ type testWriter struct {
 	written []byte
 }
 
-func (*testWriter) CloseBoundary(ctx context.Context) error {
+func (*testWriter) CloseBoundary(ctx context.Context) (writer.Uploadeable, error) {
 	panic("unimplemented")
 }
 
@@ -81,11 +81,6 @@ func (*testWriter) StartBoundary(*bstream.Range) error {
 // Type implements writer.Writer
 func (*testWriter) Type() writer.FileType {
 	return writer.FileTypeJSONL
-}
-
-// Upload implements writer.Writer
-func (*testWriter) Upload(ctx context.Context) error {
-	panic("unimplemented")
 }
 
 // Write implements writer.Writer

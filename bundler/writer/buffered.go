@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
 
@@ -27,7 +26,6 @@ type BufferedIO struct {
 func NewBufferedIO(
 	bufferMaxSize uint64,
 	workingDir string,
-	outputStore dstore.Store,
 	fileType FileType,
 	zlogger *zap.Logger,
 ) *BufferedIO {
@@ -37,7 +35,7 @@ func NewBufferedIO(
 
 	return &BufferedIO{
 		bufferMazSize: bufferMaxSize,
-		baseWriter:    newBaseWriter(outputStore, fileType, zlogger),
+		baseWriter:    newBaseWriter(fileType, zlogger),
 		workingDir:    workingDir,
 	}
 }
@@ -64,52 +62,37 @@ func (s *BufferedIO) StartBoundary(blockRange *bstream.Range) error {
 	return nil
 }
 
-func (s *BufferedIO) CloseBoundary(ctx context.Context) error {
+func (s *BufferedIO) CloseBoundary(ctx context.Context) (Uploadeable, error) {
+	defer func() {
+		s.activeFile = nil
+	}()
+
 	if s.activeFile == nil {
-		return fmt.Errorf("no active file")
+		return nil, fmt.Errorf("no active file")
 	}
 
 	if s.activeFile.writer.AllDataFitInMemory() {
 		s.zlogger.Info("all data from range is in memory, no need to flush")
-		return nil
+		return &dataFile{
+			reader:         bytes.NewReader(s.activeFile.writer.MemoryData()),
+			outputFilename: s.activeFile.outputFilename,
+		}, nil
 	}
 
 	s.zlogger.Info("flushing buffered writter")
 	if err := s.activeFile.writer.Flush(); err != nil {
-		return fmt.Errorf("flushing buffered active writer: %w", err)
+		return nil, fmt.Errorf("flushing buffered active writer: %w", err)
 	}
 
 	if err := s.activeFile.lazyFile.Close(); err != nil {
-		return fmt.Errorf("closing file: %w", err)
+		return nil, fmt.Errorf("closing file: %w", err)
 	}
 
-	return nil
-}
-
-func (s *BufferedIO) Upload(ctx context.Context) error {
-	var logFields []zap.Field
-	if s.activeFile.writer.AllDataFitInMemory() {
-		logFields = append(logFields, zap.String("from", "memory"))
-
-		reader := bytes.NewReader(s.activeFile.writer.MemoryData())
-		if err := s.outputStore.WriteObject(ctx, s.activeFile.outputFilename, reader); err != nil {
-			return fmt.Errorf("write object: %w", err)
-		}
-	} else {
-		workingPath := s.activeFile.Path()
-		logFields = append(logFields, zap.String("from", "file"), zap.String("working_path", workingPath))
-
-		// PushLocalFile actually removes the file once uploaded
-		if err := s.outputStore.PushLocalFile(ctx, workingPath, s.activeFile.outputFilename); err != nil {
-			return fmt.Errorf("copy file from worling output: %w", err)
-		}
-	}
-
-	logFields = append(logFields, zap.String("output_path", s.activeFile.outputFilename))
-	s.zlogger.Info("working file successfully copied to output store", logFields...)
-
-	s.activeFile = nil
-	return nil
+	workingPath := s.activeFile.Path()
+	return &localFile{
+		localFilePath:  workingPath,
+		outputFilename: s.activeFile.outputFilename,
+	}, nil
 }
 
 func (s *BufferedIO) Write(data []byte) (n int, err error) {
