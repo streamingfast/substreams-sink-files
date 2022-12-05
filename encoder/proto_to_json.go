@@ -3,9 +3,11 @@ package encoder
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/pq"
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
@@ -23,31 +25,27 @@ func NewProtoToJson(fiedPath string, outputModuleDesc *desc.MessageDescriptor) (
 	return &ProtoToJson{querier: entitiesQuery, outputModuleDesc: outputModuleDesc}, nil
 }
 
-func (p *ProtoToJson) Encode(output *pbsubstreams.ModuleOutput) ([]byte, error) {
+func (p *ProtoToJson) EncodeTo(output *pbsubstreams.ModuleOutput, writer writer.Writer) error {
+	fmt.Println("Typeurl", output.GetMapOutput().TypeUrl)
 	entities, err := p.querier.Resolve(output.GetMapOutput().GetValue(), p.outputModuleDesc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve entities query: %w", err)
+		return fmt.Errorf("failed to resolve entities query: %w", err)
 	}
-
-	var buf []byte
-	for _, entity := range entities {
-		cnt, err := protoToJson(proto.Message(entity))
+	for idx, entity := range entities {
+		err := protoToJson(proto.Message(entity), writer)
 		if err != nil {
-			return nil, fmt.Errorf("failed to encode: %w", err)
+			return fmt.Errorf("encode entity at index %d: %w", idx, err)
 		}
-		buf = append(buf, cnt...)
 	}
 
-	return buf, nil
+	return nil
 }
 
-func protoToJson(message proto.Message) ([]byte, error) {
-	buf := []byte{}
-	data, err := json.Marshal(message)
-	if err != nil {
-		return nil, fmt.Errorf("json marshal: %w", err)
+func protoToJson(message proto.Message, writer writer.Writer) error {
+	// The `NewEncoder(writer).Encode(message)` automatically adds "\n" at the end
+	if err := json.NewEncoder(writer).Encode(message); err != nil {
+		return fmt.Errorf("json encoder: %w", err)
 	}
-	buf = append(buf, data...)
-	buf = append(buf, byte('\n'))
-	return buf, nil
+
+	return nil
 }

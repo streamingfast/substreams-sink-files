@@ -2,6 +2,7 @@ package writer
 
 import (
 	"context"
+
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 )
@@ -26,8 +27,8 @@ func (n *Noop) Upload(ctx context.Context) error {
 	return nil
 }
 
-func (n *Noop) Write(data []byte) error {
-	return nil
+func (n *Noop) Write(data []byte) (int, error) {
+	return len(data), nil
 }
 
 func (n *Noop) Type() FileType {

@@ -22,6 +22,8 @@ type activeFile struct {
 	err             error
 }
 
+var _ Writer = (*DStoreIO)(nil)
+
 type DStoreIO struct {
 	baseWriter
 
@@ -35,7 +37,7 @@ func NewDStoreIO(
 	outputStore dstore.Store,
 	fileType FileType,
 	zlogger *zap.Logger,
-) Writer {
+) *DStoreIO {
 	return &DStoreIO{
 		baseWriter: newBaseWriter(outputStore, fileType, zlogger),
 		workingDir: workingDir,
@@ -111,14 +113,12 @@ func (s *DStoreIO) Upload(ctx context.Context) error {
 	return nil
 }
 
-func (s *DStoreIO) Write(data []byte) error {
+func (s *DStoreIO) Write(data []byte) (n int, err error) {
 	if s.activeFile == nil {
-		return fmt.Errorf("failed to write to active file")
+		return 0, fmt.Errorf("failed to write to active file")
 	}
-	if _, err := s.activeFile.writer.Write(data); err != nil {
-		return err
-	}
-	return nil
+
+	return s.activeFile.writer.Write(data)
 }
 
 func (s *DStoreIO) launchWriter(file *activeFile, reader io.Reader) {

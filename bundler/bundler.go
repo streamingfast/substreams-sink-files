@@ -3,10 +3,11 @@ package bundler
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 
 	"github.com/streamingfast/bstream"
 	sink "github.com/streamingfast/substreams-sink"
@@ -98,12 +99,12 @@ func (b *Bundler) TrackBlockProcessDuration(elapsed time.Duration) {
 	b.stats.addProcessingDataDur(elapsed)
 }
 
-func (b *Bundler) Write(cursor *sink.Cursor, data []byte) error {
-	if err := b.boundaryWriter.Write(data); err != nil {
-		return fmt.Errorf("failed to write data: %w", err)
-	}
+func (b *Bundler) Writer() writer.Writer {
+	return b.boundaryWriter
+}
+
+func (b *Bundler) SetCursor(cursor *sink.Cursor) {
 	b.stateStore.setCursor(cursor)
-	return nil
 }
 
 func (b *Bundler) Start(blockNum uint64) error {

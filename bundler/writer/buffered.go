@@ -14,6 +14,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var _ Writer = (*BufferedIO)(nil)
+
 type BufferedIO struct {
 	baseWriter
 
@@ -110,14 +112,12 @@ func (s *BufferedIO) Upload(ctx context.Context) error {
 	return nil
 }
 
-func (s *BufferedIO) Write(data []byte) error {
+func (s *BufferedIO) Write(data []byte) (n int, err error) {
 	if s.activeFile == nil {
-		return fmt.Errorf("failed to write to active file")
+		return 0, fmt.Errorf("failed to write to active file")
 	}
-	if _, err := s.activeFile.writer.Write(data); err != nil {
-		return err
-	}
-	return nil
+
+	return s.activeFile.writer.Write(data)
 }
 
 var _ io.WriteCloser = (*LazyFile)(nil)
@@ -243,17 +243,22 @@ func (w *IntelligentWriter) MemoryData() []byte {
 	// steps to access the buffered data without an allocation.
 	//
 	// The trick here is to use `Flush` primitive, we know the data is fully
-	// in memory at this point. Implemented of `Flush` on `bufio.Writer` calls
-	// the wrapped writer directly with the unaccessible buffer like `writ.Write(b.buf[0:n])`
-	// where `n` is amount of data buffered (all in your case). It passes this buffer
-	// straight to `writ` instance.
+	// in memory at this point. Implementation of `Flush` on `bufio.Writer` calls
+	// the wrapped writer directly with the `writ.Write(b.buf[0:n])` where b is
+	// `bufio.Writer` private inacessible buffer and `n` is amount of data
+	// buffered. You can see in the invocation of `Write` that it passes his private
+	// buffer straight. This means the writer's `Write` method will receive this
+	// "private" buffer.
 	//
-	// We thus have now our `memoryBufferedWriter` struct which we will switch its mode
-	// to now record everything in memory.
+	// Now, we need to hijack `Write` somehow. For this, we have created
+	// `memoryBufferedWriter` struct. This special writer has a mode that when activated,
+	// subsequent calls to `Write` records the received buffer in memory.
 	w.underlyingWritter.NextWritesToMemory = true
 
-	// And we call `Flush` which triggers the `writ.Write(b.buf[0:n])` and which will reach
-	// our `memoryBufferedWriter` which itself will keep a reference to `b.buf[0:n]`.
+	// Final step is to call `Flush` which triggers ours specialized
+	// `memoryBufferedWriter.Write(b.buf[0:n])` and which will reach which itself
+	// keep a reference to `b.buf[0:n]`, giving us access indirectly to underlying
+	// buffer.
 	if err := w.Writer.Flush(); err != nil {
 		panic(fmt.Errorf("this should have been infallible because we write directly received 'b.buf[0:n]', there is a flaw in our logic: %w", err))
 	}

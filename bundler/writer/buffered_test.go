@@ -27,6 +27,13 @@ func TestNewBufferedIO(t *testing.T) {
 		return
 	}
 
+	newSimplerWritter := func(t *testing.T, writer *BufferedIO) *simplerWriter {
+		return &simplerWriter{
+			writer: writer,
+			t:      t,
+		}
+	}
+
 	tests := []struct {
 		name       string
 		bufferSize uint64
@@ -36,9 +43,11 @@ func TestNewBufferedIO(t *testing.T) {
 			"all in memory no write",
 			16,
 			func(t *testing.T, writer *BufferedIO, workingDir string, output *dstore.MockStore) {
+				simpler := newSimplerWritter(t, writer)
+
 				require.NoError(t, writer.StartBoundary(bstream.NewInclusiveRange(0, 10)))
-				require.NoError(t, writer.Write([]byte("{first}")))
-				require.NoError(t, writer.Write([]byte("{second}")))
+				require.NoError(t, simpler.Write([]byte("{first}")))
+				require.NoError(t, simpler.Write([]byte("{second}")))
 
 				require.NoError(t, writer.CloseBoundary(context.Background()))
 				writtenFiles := listFiles(workingDir)
@@ -56,9 +65,11 @@ func TestNewBufferedIO(t *testing.T) {
 			"write to file",
 			4,
 			func(t *testing.T, writer *BufferedIO, workingDir string, output *dstore.MockStore) {
+				simpler := newSimplerWritter(t, writer)
+
 				require.NoError(t, writer.StartBoundary(bstream.NewInclusiveRange(0, 10)), "start boundary")
-				require.NoError(t, writer.Write([]byte("{first}")), "write first content")
-				require.NoError(t, writer.Write([]byte("{second}")), "write second content")
+				require.NoError(t, simpler.Write([]byte("{first}")), "write first content")
+				require.NoError(t, simpler.Write([]byte("{second}")), "write second content")
 
 				require.NoError(t, writer.CloseBoundary(context.Background()), "closing boundary")
 
@@ -83,4 +94,28 @@ func TestNewBufferedIO(t *testing.T) {
 			tt.checks(t, writer, workingDir, outputStore)
 		})
 	}
+}
+
+type simplerWriter struct {
+	writer *BufferedIO
+	t      *testing.T
+}
+
+func (w *simplerWriter) Write(buf []byte) (err error) {
+	w.t.Helper()
+
+	n, err := w.writer.Write(buf)
+	if n < 0 {
+		w.t.Fatal("writer returned negative byte written, this invalid according to 'io.Writer' spec")
+	}
+
+	if n > len(buf) {
+		w.t.Fatal("writer returned more written byte than our actual buffer length, this invalid according to 'io.Writer' spec")
+	}
+
+	if n < len(buf) && err == nil {
+		w.t.Fatal("writer returned less written byte than our actual buffer length but err is nil, this invalid according to 'io.Writer' spec")
+	}
+
+	return err
 }

@@ -28,9 +28,9 @@ main() {
     "--boundary-writer-type=in_memory" \
     "--encoder=lines" \
     "--state-store=$output_dir/working/state.yaml" \
-    "mainnet.eth.streamingfast.io:443" \
+    "${SUBSTREAMS_ENDPOINT:-"mainnet.eth.streamingfast.io:443"}" \
     "gs://staging.dfuseio-global.appspot.com/substreams/eth-token-transfers/spkg/substreams-v0.3.0.spkg" \
-    "map_json_transfers" \
+    "${SUBSTREAMS_MODULE:-"map_json_transfers"}" \
     "$output_dir/out" \
     "$@"
 }

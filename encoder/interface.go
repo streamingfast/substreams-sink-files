@@ -1,7 +1,10 @@
 package encoder
 
-import pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+import (
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
+	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+)
 
 type Encoder interface {
-	Encode(output *pbsubstreams.ModuleOutput) ([]byte, error)
+	EncodeTo(output *pbsubstreams.ModuleOutput, writer writer.Writer) error
 }

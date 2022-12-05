@@ -3,8 +3,9 @@ package substreams_file_sink
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/substreams-sink-files/encoder"
 	"time"
+
+	"github.com/streamingfast/substreams-sink-files/encoder"
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
@@ -130,15 +131,12 @@ func (fs *FileSinker) handleBlockScopeData(ctx context.Context, cursor *sink.Cur
 		}
 
 		t0 := time.Now()
-		data, err := fs.encoder.Encode(output)
-		if err != nil {
-			return fmt.Errorf("failed to resolve entities query: %w", err)
+		if err := fs.encoder.EncodeTo(output, fs.bundler.Writer()); err != nil {
+			return fmt.Errorf("encode block scoped data: %w", err)
 		}
 		fs.bundler.TrackBlockProcessDuration(time.Since(t0))
 
-		if err := fs.bundler.Write(cursor, data); err != nil {
-			return fmt.Errorf("failed to write entities: %w", err)
-		}
+		fs.bundler.SetCursor(cursor)
 	}
 
 	return nil

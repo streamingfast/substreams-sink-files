@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
+
+var _ Writer = (*Mem)(nil)
 
 type Mem struct {
 	baseWriter
@@ -20,7 +23,7 @@ func NewMem(
 	outputStore dstore.Store,
 	fileType FileType,
 	zlogger *zap.Logger,
-) Writer {
+) *Mem {
 	return &Mem{
 		baseWriter: newBaseWriter(outputStore, fileType, zlogger),
 		buf:        []byte{},
@@ -54,7 +57,7 @@ func (m *Mem) CloseBoundary(_ context.Context) error {
 	return nil
 }
 
-func (m *Mem) Write(data []byte) error {
+func (m *Mem) Write(data []byte) (n int, err error) {
 	m.buf = append(m.buf, data...)
-	return nil
+	return len(data), nil
 }
