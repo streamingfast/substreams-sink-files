@@ -62,10 +62,9 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("new bunlder: %w", err)
 	}
-	fs.OnTerminating(func(err error) {
-		fs.logger.Info("file sinker terminating, closing bundle", zap.Error(err))
-		fs.bundler.Close()
-	})
+	fs.bundler.OnTerminating(fs.Shutdown)
+	fs.OnTerminating(fs.bundler.Shutdown)
+
 	fs.bundler.Launch(ctx)
 
 	encoder, err := fs.config.getEncoder(outputModule)

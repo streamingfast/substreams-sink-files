@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/shutter"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,6 +18,8 @@ import (
 )
 
 type Bundler struct {
+	*shutter.Shutter
+
 	blockCount     uint64
 	encoder        Encoder
 	stats          *boundaryStats
@@ -46,6 +49,7 @@ func New(
 		return nil, fmt.Errorf("load state store: %w", err)
 	}
 	b := &Bundler{
+		Shutter:        shutter.New(),
 		boundaryWriter: boundaryWriter,
 		stateStore:     stateStore,
 		outputStore:    outputStore,
@@ -66,23 +70,22 @@ func New(
 }
 
 func (b *Bundler) Launch(ctx context.Context) {
+	b.OnTerminating(func(err error) {
+		b.zlogger.Info("shutting down bundler", zap.Error(err))
+		b.Close()
+	})
 	b.uploadQueue.Start(ctx)
 	go func() {
 		for v := range b.uploadQueue.Out {
 			bf := v.(*boundaryFile)
 
 			if err := bf.state.Save(); err != nil {
-				b.zlogger.Warn("unable to save state",
-					zap.Error(err),
-					zap.String("d", bf.state.path),
-				)
+				b.Shutdown(fmt.Errorf("unable to save state: %w", err))
 				return
 			}
 		}
 		if b.uploadQueue.Err() != nil {
-			b.zlogger.Warn("queue error",
-				zap.Error(b.uploadQueue.Err()),
-			)
+			b.Shutdown(fmt.Errorf("upload queue failed: %w", b.uploadQueue.Err()))
 		}
 	}()
 }
