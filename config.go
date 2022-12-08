@@ -2,6 +2,7 @@ package substreams_file_sink
 
 import (
 	"fmt"
+	"github.com/streamingfast/substreams-sink-files/state"
 	"strings"
 
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
@@ -16,12 +17,12 @@ import (
 )
 
 type Config struct {
-	SubstreamStateStorePath string
-	FileWorkingDir          string
-	FileOutputStore         dstore.Store
-	BlockRange              string
-	Pkg                     *pbsubstreams.Package
+	FileWorkingDir  string
+	FileOutputStore dstore.Store
+	BlockRange      string
+	Pkg             *pbsubstreams.Package
 
+	StateStore state.Store
 	//EntitiesQuery *pq.Query
 
 	OutputModuleName string

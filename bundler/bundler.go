@@ -6,8 +6,7 @@ import (
 	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
-	"os"
-	"path/filepath"
+	"github.com/streamingfast/substreams-sink-files/state"
 	"time"
 
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
@@ -25,7 +24,7 @@ type Bundler struct {
 	stats          *boundaryStats
 	boundaryWriter writer.Writer
 	outputStore    dstore.Store
-	stateStore     *StateStore
+	stateStore     state.Store
 	fileType       writer.FileType
 	activeBoundary *bstream.Range
 	uploadQueue    *dhammer.Nailer
@@ -33,21 +32,13 @@ type Bundler struct {
 }
 
 func New(
-	stateFilePath string,
 	size uint64,
 	boundaryWriter writer.Writer,
+	stateStore state.Store,
 	outputStore dstore.Store,
 	zlogger *zap.Logger,
 ) (*Bundler, error) {
-	stateFileDirectory := filepath.Dir(stateFilePath)
-	if err := os.MkdirAll(stateFileDirectory, os.ModePerm); err != nil {
-		return nil, fmt.Errorf("create state file directories: %w", err)
-	}
 
-	stateStore, err := loadStateStore(stateFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("load state store: %w", err)
-	}
 	b := &Bundler{
 		Shutter:        shutter.New(),
 		boundaryWriter: boundaryWriter,
@@ -99,7 +90,7 @@ func (b *Bundler) Close() {
 }
 
 func (b *Bundler) GetCursor() (*sink.Cursor, error) {
-	return b.stateStore.Read()
+	return b.stateStore.ReadCursor()
 }
 
 func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
@@ -143,7 +134,7 @@ func (b *Bundler) Writer() writer.Writer {
 }
 
 func (b *Bundler) SetCursor(cursor *sink.Cursor) {
-	b.stateStore.setCursor(cursor)
+	b.stateStore.SetCursor(cursor)
 }
 
 func (b *Bundler) Start(blockNum uint64) error {
@@ -157,7 +148,7 @@ func (b *Bundler) Start(blockNum uint64) error {
 
 	b.stats.startBoundary(boundaryRange)
 	b.zlogger.Info("boundary started", zap.Stringer("boundary", boundaryRange))
-	b.stateStore.newBoundary(boundaryRange)
+	b.stateStore.NewBoundary(boundaryRange)
 	return nil
 }
 
@@ -169,7 +160,7 @@ func (b *Bundler) stop(ctx context.Context) error {
 		return fmt.Errorf("closing file: %w", err)
 	}
 
-	state, err := b.stateStore.Encode()
+	state, err := b.stateStore.GetState()
 	if err != nil {
 		return fmt.Errorf("failed to encode state: %w", err)
 	}
@@ -213,7 +204,7 @@ func computeEndBlock(startBlockNum, size uint64) uint64 {
 type boundaryFile struct {
 	name  string
 	file  writer.Uploadeable
-	state *stateInstance
+	state state.Saveable
 }
 
 func (b *Bundler) uploadBoundary(ctx context.Context, v interface{}) (interface{}, error) {

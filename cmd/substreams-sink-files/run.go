@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/streamingfast/substreams-sink-files/state"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -100,16 +103,26 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 
 	apiToken := readAPIToken()
 
+	stateFileDirectory := filepath.Dir(stateStorePath)
+	if err := os.MkdirAll(stateFileDirectory, os.ModePerm); err != nil {
+		return fmt.Errorf("create state file directories: %w", err)
+	}
+
+	stateStore, err := state.NewFileStateStore(stateStorePath)
+	if err != nil {
+		return fmt.Errorf("new file state store: %w", err)
+	}
+
 	config := &substreamsfile.Config{
-		SubstreamStateStorePath: stateStorePath,
-		FileOutputStore:         fileOutputStore,
-		FileWorkingDir:          fileWorkingDir,
-		BlockRange:              blockRange,
-		Pkg:                     pkg,
-		Encoder:                 encoder,
-		OutputModuleName:        outputModuleName,
-		BlockPerFile:            blocksPerFile,
-		BufferMazSize:           bufferMaxSize,
+		StateStore:       stateStore,
+		FileOutputStore:  fileOutputStore,
+		FileWorkingDir:   fileWorkingDir,
+		BlockRange:       blockRange,
+		Pkg:              pkg,
+		Encoder:          encoder,
+		OutputModuleName: outputModuleName,
+		BlockPerFile:     blocksPerFile,
+		BufferMazSize:    bufferMaxSize,
 		ClientConfig: client.NewSubstreamsClientConfig(
 			endpoint,
 			apiToken,
