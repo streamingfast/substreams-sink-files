@@ -24,14 +24,9 @@ func (l *LinesEncoder) EncodeTo(output *pbsubstreams.ModuleOutput, writer writer
 		return fmt.Errorf("failed to unmarhsall lines: %w", err)
 	}
 
-	lastIndex := len(lines.Lines) - 1
-
-	for idx, line := range lines.Lines {
+	for _, line := range lines.Lines {
 		writer.Write(line)
-
-		if idx < lastIndex {
-			writer.Write([]byte("\n"))
-		}
+		writer.Write([]byte("\n"))
 	}
 
 	return nil
