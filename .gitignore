@@ -1,5 +1,7 @@
 .envrc
 .idea
 .DS_Store
+*.spkg
+dist/
 localdata/
 state.yaml

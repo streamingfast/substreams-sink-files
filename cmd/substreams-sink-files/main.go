@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -15,14 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// Commit sha1 value, injected via go build `ldflags` at build time
-var commit = ""
-
 // Version value, injected via go build `ldflags` at build time
 var version = "dev"
-
-// Date value, injected via go build `ldflags` at build time
-var date = ""
 
 var zlog, tracer = logging.RootLogger("substreams-sink-files", "github.com/streamingfast/substreams-sink-files/cmd/substreams-sink-files")
 
@@ -73,6 +68,14 @@ func main() {
 
 func ConfigureVersion() CommandOption {
 	return CommandOptionFunc(func(cmd *cobra.Command) {
+		info, ok := debug.ReadBuildInfo()
+		if !ok {
+			panic("we should have been able to retrieve info from 'runtime/debug#ReadBuildInfo'")
+		}
+
+		commit := findSetting("vcs.revision", info.Settings)
+		date := findSetting("vcs.time", info.Settings)
+
 		var labels []string
 		if len(commit) >= 7 {
 			labels = append(labels, fmt.Sprintf("Commit %s", commit[0:7]))
@@ -88,4 +91,14 @@ func ConfigureVersion() CommandOption {
 			cmd.Version = fmt.Sprintf("%s (%s)", version, strings.Join(labels, ", "))
 		}
 	})
+}
+
+func findSetting(key string, settings []debug.BuildSetting) (value string) {
+	for _, setting := range settings {
+		if setting.Key == key {
+			return setting.Value
+		}
+	}
+
+	return ""
 }
