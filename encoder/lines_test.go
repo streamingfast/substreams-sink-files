@@ -6,7 +6,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-	pbfilesink "github.com/streamingfast/substreams-sink-files/pb"
+	pbsinkfiles "github.com/streamingfast/substreams-sink-files/pb/substreams/sink/files/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
@@ -16,30 +16,30 @@ import (
 func TestLinesEncoder_EncodeTo(t *testing.T) {
 	tests := []struct {
 		name      string
-		lines     *pbfilesink.Lines
+		lines     *pbsinkfiles.Lines
 		expected  []byte
 		assertion assert.ErrorAssertionFunc
 	}{
 		{
 			"no line",
-			&pbfilesink.Lines{Lines: nil},
+			&pbsinkfiles.Lines{Lines: nil},
 			nil,
 			assert.NoError,
 		},
 		{
 			"one line",
-			&pbfilesink.Lines{Lines: [][]byte{[]byte(`{"a":1}`)}},
-			[]byte(`{"a":1}`),
+			&pbsinkfiles.Lines{Lines: []string{`{"a":1}`}},
+			[]byte(`{"a":1}` + "\n"),
 			assert.NoError,
 		},
 		{
 			"three line",
-			&pbfilesink.Lines{Lines: [][]byte{
-				[]byte(`{"a":1}`),
-				[]byte(`{"b":2}`),
-				[]byte(`{"c":3}`),
+			&pbsinkfiles.Lines{Lines: []string{
+				`{"a":1}`,
+				`{"b":2}`,
+				`{"c":3}`,
 			}},
-			[]byte(`{"a":1}` + "\n" + `{"b":2}` + "\n" + `{"c":3}`),
+			[]byte(`{"a":1}` + "\n" + `{"b":2}` + "\n" + `{"c":3}` + "\n"),
 			assert.NoError,
 		},
 	}

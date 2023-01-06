@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+// The substreams.sink.files.v1 package can be use in your Substreams to defined a `map` module
+// whose output type will be one of the message defined in the package. The `substreams-sink-files`
+// binary will then consume your module's output to create the files containing your extracted data.
+//
+// The current package supports a single output format which is the `Lines` message which represents
+// a list of plain-text "line" that should be appended together in a single bundle.
+package substreams.sink.files.v1;
+
+option go_package = "github.com/streamingfast/substreams-sink-files/pb/sf/substreams/sink/files/v1;pbsinkfiles";
+
+// Lines represents an ordered list of lines that have been extracted of a single block. You are
+// free the format each line as you please, the `substream-sink-files` tool does not make any
+// assumption about the content and simply write the content to the current bundle with a trailing
+// new line.
+//
+// It is expected that your line do **not** contain a new line character as it will be managed
+// manually by the `substream-sink-files` tool.
+//
+// The most common use case is to use CSV or JSONL format for your line. For example, you can
+// extract each transaction out of the block as a single line in JSON format as an object. The
+// `substream-sink-files` will then package them in a bundle for N blocks.
+message Lines {
+    repeated string lines = 1;
+}

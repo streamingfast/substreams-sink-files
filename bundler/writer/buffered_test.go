@@ -53,7 +53,8 @@ func TestNewBufferedIO(t *testing.T) {
 				require.NoError(t, err)
 				writtenFiles := listFiles(workingDir)
 
-				require.NoError(t, uploadeable.Upload(context.Background(), output))
+				_, err = uploadeable.Upload(context.Background(), output)
+				require.NoError(t, err)
 
 				assert.Len(t, writtenFiles, 0)
 				assert.Equal(t, map[string][]byte{
@@ -78,7 +79,8 @@ func TestNewBufferedIO(t *testing.T) {
 
 				writtenFiles := listFiles(workingDir)
 
-				require.NoError(t, uploadeable.Upload(context.Background(), output), "upload file")
+				_, err = uploadeable.Upload(context.Background(), output)
+				require.NoError(t, err, "upload file")
 
 				assert.ElementsMatch(t, []string{"/0000000000-0000000010.tmp.jsonl"}, writtenFiles)
 				assert.Equal(t, map[string][]byte{
