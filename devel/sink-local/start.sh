@@ -2,6 +2,7 @@
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+project="$ROOT/../.."
 sink="$ROOT/../substreams-sink-files"
 
 main() {
@@ -28,8 +29,8 @@ main() {
     "--encoder=lines" \
     "--state-store=$output_dir/working/state.yaml" \
     "${SUBSTREAMS_ENDPOINT:-"mainnet.eth.streamingfast.io:443"}" \
-    "gs://staging.dfuseio-global.appspot.com/substreams/eth-token-transfers/spkg/substreams-v0.3.0.spkg" \
-    "${SUBSTREAMS_MODULE:-"map_json_transfers"}" \
+    "${project}/docs/tutorial/substreams.yaml" \
+    "${SUBSTREAMS_MODULE:-"jsonl_out"}" \
     "$output_dir/out" \
     "$@"
 }

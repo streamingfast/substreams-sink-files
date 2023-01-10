@@ -1,13 +1,13 @@
 specVersion: v0.1.0
 package:
   name: substreams_sink_files
-  version: v0.1.0
+  version: v0.2.0
   url: https://github.com/streamingfast/substreams-sink-files
   doc: |
     Protobuf definitions for interacting with Substreams Sink Files binary tool
 
 protobuf:
   files:
-    - substreams/sink/files/v1/files.proto
+    - sf/substreams/sink/files/v1/files.proto
   importPaths:
     - ./proto

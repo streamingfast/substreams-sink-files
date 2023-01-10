@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-// The substreams.sink.files.v1 package can be use in your Substreams to defined a `map` module
+// The `sf.substreams.sink.files.v1` package can be use in your Substreams to defined a `map` module
 // whose output type will be one of the message defined in the package. The `substreams-sink-files`
 // binary will then consume your module's output to create the files containing your extracted data.
 //
 // The current package supports a single output format which is the `Lines` message which represents
 // a list of plain-text "line" that should be appended together in a single bundle.
-package substreams.sink.files.v1;
+package sf.substreams.sink.files.v1;
 
 option go_package = "github.com/streamingfast/substreams-sink-files/pb/sf/substreams/sink/files/v1;pbsinkfiles";
 

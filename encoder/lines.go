@@ -7,7 +7,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-	pbsinkfiles "github.com/streamingfast/substreams-sink-files/pb/substreams/sink/files/v1"
+	pbsinkfiles "github.com/streamingfast/substreams-sink-files/pb/sf/substreams/sink/files/v1"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 
