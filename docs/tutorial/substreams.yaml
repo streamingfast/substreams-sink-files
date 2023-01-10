@@ -4,7 +4,7 @@ package:
   version: v0.1.0
 
 imports:
-  sink_files: https://github.com/streamingfast/substreams-sink-files/releases/download/v0.1.0/substreams-sink-files-v0.1.0.spkg
+  sink_files: https://github.com/streamingfast/substreams-sink-files/releases/download/v0.2.0/substreams-sink-files-v0.2.0.spkg
 
 binaries:
   default:
@@ -17,4 +17,4 @@ modules:
     inputs:
       - source: sf.ethereum.type.v2.Block
     output:
-      type: proto:substreams.sink.files.v1.Lines
+      type: proto:sf.substreams.sink.files.v1.Lines

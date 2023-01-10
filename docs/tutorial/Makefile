@@ -8,4 +8,4 @@ stream: build
 
 .PHONY: codegen
 codegen:
-	substreams protogen ./substreams-filesink-tutorial.yaml --exclude-paths="sf/substreams,google"
+	substreams protogen ./substreams.yaml --exclude-paths="sf/substreams/v1,google"
