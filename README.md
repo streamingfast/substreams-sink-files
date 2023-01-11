@@ -1,3 +1,5 @@
-# Substreams Sink Files
+# Substreams sink files
 
-This is a command line tool to quickly sync a substreams to a files.
+The `substreams-sink-files` tool provides the ability to pipe data extracted from a blockchain to various types of files-based persistence solutions.
+
+For example, you could extract all of the ERC20, ERC721, and ERC1155 transfers from the Ethereum blockchain and persist the data to a files-based store.
