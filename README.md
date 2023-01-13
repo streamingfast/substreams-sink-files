@@ -15,33 +15,11 @@
 
 ## Installation
 
-To install the `substreams-sink-files` tool you need to clone its repository to your machine.
+Install `substreams-sink-files` by using the pre-built binary release [available in the official GitHub repository](https://github.com/streamingfast/substreams-sink-files/releases).
 
-After the files have been cloned you'll need to INSERT EXACT COMMANDS HERE.
+Extract `substreams-sink-files` into a folder available in your PATH.
 
-```bash
-command
-```
-
-Running the INSERT COMMAND will result in output similar to the following in the terminal window:
-
-```bash
-output
-```
-
-To verify and check the installation run the tool and use the `version` flag. Output similar to the following will be printed to the terminal window:
-
-```bash
-substreams-sink-files version v0.2.0
-```
-
-To use the tool from anywhere on your system, ensure the `PATH` environment variable has been properly updated.
-
-Update the `~/.bashrc` configuration file on your machine and restart the shell session by using:
-
-```bash
-export GOPATH=$HOME/go
-```
+The binary file is installed in your GO_PATH, typically \$HOME/go/bin. Make sure this folder is included in your PATH environment variable.
 
 ## Using the `substreams-sink-files` tool
 
