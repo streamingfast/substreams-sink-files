@@ -6,20 +6,14 @@
 
 ## Prerequisites
 
-- Go installation and compiler
-- Rust installation and compiler
-- Cloned `substreams-sink-files` repository
 - A Substreams module prepared for a files-sink
-- Knowledge of blockchain development
 - Cloud-based file storage mechanism (optional)
 
 ## Installation
 
 Install `substreams-sink-files` by using the pre-built binary release [available in the official GitHub repository](https://github.com/streamingfast/substreams-sink-files/releases).
 
-Extract `substreams-sink-files` into a folder available in your PATH.
-
-The binary file is installed in your GO_PATH, typically \$HOME/go/bin. Make sure this folder is included in your PATH environment variable.
+Extract `substreams-sink-files` into a folder and ensure this folder is referenced globally via your `PATH` environment variable.
 
 ## Using the `substreams-sink-files` tool
 
@@ -50,6 +44,22 @@ Output resembling the following will be printed to the terminal window for prope
 2023-01-09T07:45:04.049-0800 INFO (substreams-sink-files) starting stats service {"runs_each": "2s"}
 2023-01-09T07:45:06.052-0800 INFO (substreams-sink-files) substreams sink stats {"progress_msg_rate": "0.000 msg/s (0 total)", "block_rate": "650.000 blocks/s (1300 total)", "last_block": "#1299 (a0f0f283e0d297dd4bcf4bbff916b1df139d08336ad970e77f26b45f9a521802)"}
 ```
+
+### Cursors
+
+When you use Substreams, it sends back a block to a consumer using an opaque cursor. This cursor points to the exact location within the blockchain where the block is. In case your connection terminates or the process restarts, upon re-connection, Substreams sends back the cursor of the last written bundle in the request so that the stream of data can be resumed exactly where it left off and data integrity is maintained.
+
+You will find that the cursor is saved in a file on disk. The location of this file is specified by the flag `--state-store` which points to a local folder. You must ensure that this file is properly saved to a persistent location. If the file is lost, the `substreams-sink-files` tool will restart from the beginning of the chain, redoing all the previous processing.
+
+Therefore, It is crucial that this file is properly persisted and follows your deployment of `substreams-sink-files` to avoid any data loss.
+
+### Cloud-based storage
+
+You can use the `substreams-sink-files` tool to route data to files on your local file system and cloud-based storage solutions. To use a cloud-based solution such as Google Cloud Storage bucket, S3 compatible bucket, or Azure bucket, you need to make sure it is set up properly. Then, instead of referencing a local file in the `substreams-sink-files run` command, use the path to the bucket. The paths resemble `gs://<bucket>/<path>`, `s3://<bucket>/<path>`, and `az://<bucket>/<path>` respectively. Be sure to update the values according to your account and provider.
+
+### Limitations
+
+When you use the `substreams-sink-files` tool, you will find that it syncs up to the most recent "final" block of the chain. This means it is not real-time. Additionally, the tool writes bundles to disk when it has seen 10,000 blocks. As a result, the latency of the last available bundle can be delayed by around 10,000 blocks.
 
 ## Contributing
 
