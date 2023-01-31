@@ -6,8 +6,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
-	"github.com/streamingfast/pq"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
+	"github.com/streamingfast/substreams-sink-files/pq"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 )
 

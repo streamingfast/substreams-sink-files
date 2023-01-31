@@ -11,10 +11,10 @@ require (
 	github.com/streamingfast/bstream v0.0.2-0.20221209144659-0fb1074db0f3
 	github.com/streamingfast/cli v0.0.4-0.20220630165922-bc58c6666fc8
 	github.com/streamingfast/derr v0.0.0-20220526184630-695c21740145
+	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2
 	github.com/streamingfast/dmetrics v0.0.0-20221129121022-a1733eca1981
 	github.com/streamingfast/dstore v0.1.1-0.20221202204228-cac992522adb
 	github.com/streamingfast/logging v0.0.0-20220813175024-b4fbb0e893df
-	github.com/streamingfast/pq v0.0.0-20221121194429-f73b4c86e80e
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams v0.0.22-0.20221124192438-6ef4954ac865
 	github.com/streamingfast/substreams-sink v0.0.0-20221130163929-2dcf0a22b379
@@ -22,10 +22,7 @@ require (
 	go.uber.org/zap v1.23.0
 )
 
-require (
-	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
-	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2 // indirect
-)
+require github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 
 require (
 	cloud.google.com/go v0.104.0 // indirect
