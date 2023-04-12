@@ -17,7 +17,7 @@ require (
 	github.com/streamingfast/logging v0.0.0-20220813175024-b4fbb0e893df
 	github.com/streamingfast/shutter v1.5.0
 	github.com/streamingfast/substreams v0.0.22-0.20221124192438-6ef4954ac865
-	github.com/streamingfast/substreams-sink v0.0.0-20230403140748-db3b0d195289
+	github.com/streamingfast/substreams-sink v0.0.0-20230412152225-e30c51e972d3
 	github.com/test-go/testify v1.1.4
 	go.uber.org/zap v1.23.0
 )

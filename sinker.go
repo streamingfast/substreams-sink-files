@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/streamingfast/substreams-sink-files/encoder"
-
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	sink "github.com/streamingfast/substreams-sink"
 	"github.com/streamingfast/substreams-sink-files/bundler"
+	"github.com/streamingfast/substreams-sink-files/encoder"
 	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
 	"go.uber.org/zap"
 )
@@ -98,7 +97,7 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 
 	fs.sink.OnTerminating(fs.Shutdown)
 	fs.OnTerminating(func(err error) {
-		fs.logger.Info(" file sinker terminating shutting down sink")
+		fs.logger.Info("file sinker terminating shutting down sink")
 		fs.sink.Shutdown(err)
 	})
 
