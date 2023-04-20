@@ -2,12 +2,13 @@ package state
 
 import (
 	"fmt"
-	"github.com/ghodss/yaml"
-	"github.com/streamingfast/bstream"
-	sink "github.com/streamingfast/substreams-sink"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/streamingfast/bstream"
+	sink "github.com/streamingfast/substreams-sink"
+	"gopkg.in/yaml.v3"
 )
 
 var _ Store = (*FileStateStore)(nil)
@@ -40,7 +41,7 @@ func NewFileStateStore(outputPath string) (*FileStateStore, error) {
 }
 
 func (s *FileStateStore) ReadCursor() (cursor *sink.Cursor, err error) {
-	return sink.NewCursor(s.state.Cursor, bstream.NewBlockRef(s.state.Block.ID, s.state.Block.Number)), nil
+	return sink.NewCursor(s.state.Cursor)
 }
 
 func (s *FileStateStore) NewBoundary(boundary *bstream.Range) {
@@ -57,10 +58,10 @@ func (s *FileStateStore) SetCursor(cursor *sink.Cursor) {
 		s.state.RestartedAt = restartAt
 	})
 
-	s.state.Cursor = cursor.Cursor
+	s.state.Cursor = cursor.String()
 	s.state.Block = BlockState{
-		ID:     cursor.Block.ID(),
-		Number: cursor.Block.Num(),
+		ID:     cursor.Block().ID(),
+		Number: cursor.Block().Num(),
 	}
 }
 

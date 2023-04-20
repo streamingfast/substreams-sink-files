@@ -1,0 +1,5 @@
+global:
+  language: golang
+  variant: application
+release:
+  upload-substreams-spkg: substreams.yaml

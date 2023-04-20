@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	// We use the deprecated version on purpose!
 	"github.com/golang/protobuf/proto"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/pq"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type ProtoToJson struct {
@@ -25,7 +26,7 @@ func NewProtoToJson(fiedPath string, outputModuleDesc *desc.MessageDescriptor) (
 	return &ProtoToJson{querier: entitiesQuery, outputModuleDesc: outputModuleDesc}, nil
 }
 
-func (p *ProtoToJson) EncodeTo(output *pbsubstreams.ModuleOutput, writer writer.Writer) error {
+func (p *ProtoToJson) EncodeTo(output *pbsubstreamsrpc.MapModuleOutput, writer writer.Writer) error {
 	entities, err := p.querier.Resolve(output.GetMapOutput().GetValue(), p.outputModuleDesc)
 	if err != nil {
 		return fmt.Errorf("failed to resolve entities query: %w", err)

@@ -7,7 +7,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 	pbtest "github.com/streamingfast/substreams-sink-files/encoder/testdata"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
 )
@@ -93,10 +93,8 @@ func TestProtoToJson_EncodeTo(t *testing.T) {
 				Value:   []byte{0x0a, 0x02, 0x08, 0x01},
 			}
 
-			module := &pbsubstreams.ModuleOutput{
-				Data: &pbsubstreams.ModuleOutput_MapOutput{
-					MapOutput: test,
-				},
+			module := &pbsubstreamsrpc.MapModuleOutput{
+				MapOutput: test,
 			}
 
 			tt.assertion(t, encoder.EncodeTo(module, writer))

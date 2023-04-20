@@ -7,7 +7,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	pbsinkfiles "github.com/streamingfast/substreams-sink-files/pb/sf/substreams/sink/files/v1"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -51,10 +51,8 @@ func TestLinesEncoder_EncodeTo(t *testing.T) {
 			lines, err := anypb.New(tt.lines)
 			require.NoError(t, err)
 
-			module := &pbsubstreams.ModuleOutput{
-				Data: &pbsubstreams.ModuleOutput_MapOutput{
-					MapOutput: lines,
-				},
+			module := &pbsubstreamsrpc.MapModuleOutput{
+				MapOutput: lines,
 			}
 
 			tt.assertion(t, encoder.EncodeTo(module, writer))

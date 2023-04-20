@@ -2,6 +2,7 @@
 .idea
 .DS_Store
 *.spkg
+build/
 dist/
 localdata/
 state.yaml

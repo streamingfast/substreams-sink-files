@@ -8,7 +8,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	pbsinkfiles "github.com/streamingfast/substreams-sink-files/pb/sf/substreams/sink/files/v1"
-	pbsubstreams "github.com/streamingfast/substreams/pb/sf/substreams/v1"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 )
 
 type LinesEncoder struct {
@@ -18,7 +18,7 @@ func NewLineEncoder() *LinesEncoder {
 	return &LinesEncoder{}
 }
 
-func (l *LinesEncoder) EncodeTo(output *pbsubstreams.ModuleOutput, writer writer.Writer) error {
+func (l *LinesEncoder) EncodeTo(output *pbsubstreamsrpc.MapModuleOutput, writer writer.Writer) error {
 	// FIXME: Improve by using a customized probably decoder, maybe Vitess, or we could
 	// even create our own which should be quiter simpler and could even reduce allocations
 	lines := &pbsinkfiles.Lines{}

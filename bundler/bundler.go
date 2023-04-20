@@ -3,11 +3,12 @@ package bundler
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams-sink-files/state"
-	"time"
 
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 
@@ -65,6 +66,7 @@ func (b *Bundler) Launch(ctx context.Context) {
 		b.zlogger.Info("shutting down bundler", zap.Error(err))
 		b.Close()
 	})
+
 	b.uploadQueue.Start(ctx)
 	go func() {
 		for v := range b.uploadQueue.Out {
