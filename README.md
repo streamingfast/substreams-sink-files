@@ -19,30 +19,45 @@ Extract `substreams-sink-files` into a folder and ensure this folder is referenc
 
 The `run` command is the primary way to work with the `substreams-sink-files` tool. The command for your project will resemble the following:
 
-{% code overflow="wrap" %}
-
 ```bash
-substreams-sink-files run --encoder=lines --state-store=./localdata/working/state.yaml mainnet.eth.streamingfast.io:443 substreams.yaml jsonl_out ./localdata/out
+substreams-sink-files run \
+    mainnet.eth.streamingfast.io:443 \
+    https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg \
+    jsonl_out \
+    ./localdata/out \
+    --encoder=lines \
+    --file-working-dir="./localdata/working" \
+    --state-store=./localdata/working/state.yaml \
+    10_000_000:+100_000
 ```
 
-You'll need to use values for your Substreams module and desired output for each of the flags in the command.
-
-{% endcode %}
+> **Note** We use a custom range here `10_000_000:+100_000` because there is no ERC20/ERC721/ERC1155 until a long time in the chain.
 
 Output resembling the following will be printed to the terminal window for properly issued commands and a properly set up and configured Substreams module.
 
 ```bash
-2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) starting prometheus metrics server {"listen_addr": "localhost:9102"}
-2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) sink to files {"file_output_path": "./localdata/out", "file_working_dir": "./localdata/working", "endpoint": "mainnet.eth.streamingfast.io:443", "encoder": "lines", "manifest_path": "substreams.yaml", "output_module_name": "jsonl_out", "block_range": "", "state_store": "./localdata/working/state.yaml", "blocks_per_file": 10000, "buffer_max_size": 67108864}
-2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) reading substreams manifest {"manifest_path": "substreams.yaml"}
-2023-01-09T07:45:02.563-0800 INFO (substreams-sink-files) starting pprof server {"listen_addr": "localhost:6060"}
-2023-01-09T07:45:04.041-0800 INFO (pipeline) computed start block {"module_name": "jsonl_out", "start_block": 0}
-2023-01-09T07:45:04.042-0800 INFO (substreams-sink-files) ready, waiting for signal to quit
-2023-01-09T07:45:04.045-0800 INFO (substreams-sink-files) setting up sink {"block_range": {"start_block": 0, "end_block": "None"}, "cursor": {"Cursor":"","Block":{}}}
-2023-01-09T07:45:04.048-0800 INFO (substreams-sink-files) starting new file boundary {"boundary": "[0, 10000)"}
-2023-01-09T07:45:04.049-0800 INFO (substreams-sink-files) boundary started {"boundary": "[0, 10000)"}
-2023-01-09T07:45:04.049-0800 INFO (substreams-sink-files) starting stats service {"runs_each": "2s"}
-2023-01-09T07:45:06.052-0800 INFO (substreams-sink-files) substreams sink stats {"progress_msg_rate": "0.000 msg/s (0 total)", "block_rate": "650.000 blocks/s (1300 total)", "last_block": "#1299 (a0f0f283e0d297dd4bcf4bbff916b1df139d08336ad970e77f26b45f9a521802)"}
+2023-06-16T11:23:52.342-0400 INFO (substreams-sink-files) starting prometheus metrics server {"listen_addr": "localhost:9102"}
+2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) sink to files {"file_output_path": "./localdata/out", "file_working_dir": "./localdata/working", "encoder_type": "lines", "state_store": "./localdata/working/state.yaml", "blocks_per_file": 10000, "buffer_max_size": 67108864}
+2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) sinker from CLI {"endpoint": "mainnet.eth.streamingfast.io:443", "manifest_path": "https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg", "output_module_name": "jsonl_out", "expected_module_type": "<Ignored>", "block_range": "10_000_000:+100_000"}
+2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) reading substreams manifest {"manifest_path": "https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg"}
+2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) starting pprof server {"listen_addr": "localhost:6060"}
+2023-06-16T11:23:52.660-0400 INFO (substreams-sink-files) validating output module {"module_name": "jsonl_out"}
+2023-06-16T11:23:52.660-0400 INFO (substreams-sink-files) validating output module type {"module_name": "jsonl_out", "module_type": "proto:substreams.sink.files.v1.Lines"}
+2023-06-16T11:23:52.663-0400 INFO (substreams-sink-files) sinker configured {"mode": "Production", "module_count": 3, "output_module_name": "jsonl_out", "output_module_type": "proto:substreams.sink.files.v1.Lines", "output_module_hash": "0d94c2c7662fbe04923c43d9f8732e0858f7af37", "client_config": "mainnet.eth.streamingfast.io:443 (insecure: false, plaintext: false, JWT present: true)", "buffer": true, "block_range": "[10000000, 10100000)", "infinite_retry": false, "final_blocks_only": false, "liveness_checker": true}
+2023-06-16T11:23:52.666-0400 INFO (substreams-sink-files) ready, waiting for signal to quit
+2023-06-16T11:23:52.667-0400 INFO (substreams-sink-files) starting new file boundary {"boundary": "[10000000, 10010000)"}
+2023-06-16T11:23:52.684-0400 INFO (substreams-sink-files) boundary started {"boundary": "[10000000, 10010000)"}
+2023-06-16T11:23:52.684-0400 INFO (substreams-sink-files) starting file sink {"restarting_at": "#10009999 (601b697795b7435dcb3f661aeea877fae4e3b534044a5940497b0a04a8845621)"}
+2023-06-16T11:23:52.684-0400 INFO (substreams-sink-files) starting sinker {"stats_refresh_each": "15s", "restarting_at": "#10009999 (601b697795b7435dcb3f661aeea877fae4e3b534044a5940497b0a04a8845621)", "end_at": "#1374390772024"}
+2023-06-16T11:23:52.801-0400 INFO (substreams-sink-files) session initialized with remote endpoint {"trace_id": "8fd18de5b6acb648867f4b2828bee602"}
+2023-06-16T11:23:53.054-0400 INFO (substreams-sink-files) block_num is not in active boundary {"active_boundary": "[10000000, 10010000)", "boundaries_to_skip": 0, "block_num": 10010000}
+2023-06-16T11:23:53.054-0400 INFO (substreams-sink-files) stopping file boundary
+2023-06-16T11:23:53.054-0400 INFO (substreams-sink-files) all data from range is in memory, no need to flush
+2023-06-16T11:23:53.055-0400 INFO (substreams-sink-files) queuing boundary upload {"boundary": "[10000000, 10010000)"}
+2023-06-16T11:23:53.056-0400 INFO (substreams-sink-files) bundler stats {"file_count": 1, "boundary": "[10000000, 10010000)", "boundary_process_duration": "371.596208ms", "upload_duration": "0s", "data_process_duration": "0s", "avg_upload_dur": 0, "total_upload_dur": 0, "avg_boundary_process_dur": 0.371596208, "total_boundary_process_dur": 0.371596208, "avg_data_process_dur": 0, "total_data_process_dur": 0}
+2023-06-16T11:23:53.056-0400 INFO (substreams-sink-files) starting new file boundary {"boundary": "[10010000, 10020000)"}
+2023-06-16T11:23:53.058-0400 INFO (substreams-sink-files) boundary uploaded {"boundary": "[10000000, 10010000)", "output_path": "localdata/out/0010000000-0010010000.jsonl"}
+2023-06-16T11:23:53.060-0400 INFO (substreams-sink-files) boundary started {"boundary": "[10010000, 10020000)"}
 ```
 
 ### Cursors
@@ -53,13 +68,19 @@ You will find that the cursor is saved in a file on disk. The location of this f
 
 Therefore, It is crucial that this file is properly persisted and follows your deployment of `substreams-sink-files` to avoid any data loss.
 
+### High Performance
+
+If you are looking for the fastest performance possible, we suggest that your destination source is able to handle heavy traffic. Also, to speed up things, you can allocate a lot of RAM to the process and increase the flag `--buffer-max-size` to a point where you are able to hold a full batch of N blocks in memory (checking the size of the final file is a good indicator of the size to keep stuff in memory).
+
+A lot of I/O operations is avoid if the buffer can hold everything in memory greatly speeding up the process of writing blocks bundle to its final destination.
+
 ### Cloud-based storage
 
 You can use the `substreams-sink-files` tool to route data to files on your local file system and cloud-based storage solutions. To use a cloud-based solution such as Google Cloud Storage bucket, S3 compatible bucket, or Azure bucket, you need to make sure it is set up properly. Then, instead of referencing a local file in the `substreams-sink-files run` command, use the path to the bucket. The paths resemble `gs://<bucket>/<path>`, `s3://<bucket>/<path>`, and `az://<bucket>/<path>` respectively. Be sure to update the values according to your account and provider.
 
 ### Limitations
 
-When you use the `substreams-sink-files` tool, you will find that it syncs up to the most recent "final" block of the chain. This means it is not real-time. Additionally, the tool writes bundles to disk when it has seen 10,000 blocks. As a result, the latency of the last available bundle can be delayed by around 10,000 blocks.
+When you use the `substreams-sink-files` tool, you will find that it syncs up to the most recent "final" block of the chain. This means it is not real-time. Additionally, the tool writes bundles to disk when it has seen 10,000 blocks. As a result, the latency of the last available bundle can be delayed by around 10,000 blocks. How many blocks per batch can be controlled by changing the flag `--file-block-count`
 
 ## Contributing
 

@@ -28,7 +28,7 @@ import (
 // sync run ./localdata api.dev.eth.mainnet.com substrema.spkg map_transfers .transfers[]
 
 var SyncRunCmd = Command(syncRunE,
-	"run <endpoint> <manifest> <module> <path> <output_store> [<start>:<stop>]",
+	"run <endpoint> <manifest> <module> <output_store> [<start>:<stop>]",
 	"Runs extractor code",
 	RangeArgs(4, 5),
 	Flags(func(flags *pflag.FlagSet) {
