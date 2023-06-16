@@ -26,12 +26,13 @@ main() {
   fi
 
   exec $sink run \
-    "--encoder=lines" \
-    "--state-store=$output_dir/working/state.yaml" \
     "${SUBSTREAMS_ENDPOINT:-"mainnet.eth.streamingfast.io:443"}" \
     "${project}/docs/tutorial/substreams.yaml" \
     "${SUBSTREAMS_MODULE:-"jsonl_out"}" \
     "$output_dir/out" \
+    "--encoder=lines" \
+    "--file-working-dir=$output_dir/working" \
+    "--state-store=$output_dir/working/state.yaml" \
     "$@"
 }
 
