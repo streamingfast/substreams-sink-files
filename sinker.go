@@ -39,7 +39,7 @@ func NewFileSinker(sinker *sink.Sinker, bundler *bundler.Bundler, encoder encode
 func (fs *FileSinker) Run(ctx context.Context) error {
 	cursor, err := fs.bundler.GetCursor()
 	if err != nil {
-		return fmt.Errorf("faile to read curosor: %w", err)
+		return fmt.Errorf("faile to read cursor: %w", err)
 	}
 
 	fs.Sinker.OnTerminating(fs.Shutdown)
@@ -58,13 +58,13 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 
 	expectedStartBlock := uint64(0)
 	if !cursor.IsBlank() {
-		expectedStartBlock = cursor.Block().Num()
+		expectedStartBlock = cursor.Block().Num() + 1
 	} else if blockRange := fs.BlockRange(); blockRange != nil {
 		expectedStartBlock = blockRange.StartBlock()
 	}
 
 	if err := fs.bundler.Start(expectedStartBlock); err != nil {
-		return fmt.Errorf("unable to start bunlder: %w", err)
+		return fmt.Errorf("unable to start bundler: %w", err)
 	}
 
 	fs.logger.Info("starting file sink", zap.Stringer("restarting_at", cursor.Block()))
