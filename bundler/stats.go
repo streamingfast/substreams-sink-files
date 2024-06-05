@@ -63,11 +63,11 @@ func (s *boundaryStats) Log() []zap.Field {
 		zap.Duration("boundary_process_duration", s.boundaryProcessTime),
 		zap.Duration("upload_duration", s.uploadedDuration),
 		zap.Duration("data_process_duration", s.procesingDataTime),
-		zap.Float64("avg_upload_dur", s.avgUploadDuration.Average()),
-		zap.Float64("total_upload_dur", s.avgUploadDuration.Total()),
-		zap.Float64("avg_boundary_process_dur", s.avgBoundaryProcessDuration.Average()),
-		zap.Float64("total_boundary_process_dur", s.avgBoundaryProcessDuration.Total()),
-		zap.Float64("avg_data_process_dur", s.avgDataProcessDuration.Average()),
-		zap.Float64("total_data_process_dur", s.avgDataProcessDuration.Total()),
+		zap.Duration("avg_upload_dur", s.avgUploadDuration.Average()),
+		zap.Duration("total_upload_dur", s.avgUploadDuration.Total()),
+		zap.Duration("avg_boundary_process_dur", s.avgBoundaryProcessDuration.Average()),
+		zap.Duration("total_boundary_process_dur", s.avgBoundaryProcessDuration.Total()),
+		zap.Duration("avg_data_process_dur", s.avgDataProcessDuration.Average()),
+		zap.Duration("total_data_process_dur", s.avgDataProcessDuration.Total()),
 	}
 }

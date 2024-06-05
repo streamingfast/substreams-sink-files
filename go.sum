@@ -382,8 +382,8 @@ github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca h1:/k5H6MUo5Vi
 github.com/streamingfast/dgrpc v0.0.0-20240219152146-57bb131c39ca/go.mod h1:NuKCwOHjbT0nRji0O+7+c70AiBfLHEKNoovs/gFfMPY=
 github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2 h1:/mcLVdwy6NeHWfJwuh2GD4+FMfPa59fkfM15sl8Jejk=
 github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2/go.mod h1:MyG3U4ABuf7ANS8tix+e8UUevN7B9juhEnAbslS/X3M=
-github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545 h1:SUl04bZKGAv207lp7/6CHOJIRpjUKunwItrno3K463Y=
-github.com/streamingfast/dmetrics v0.0.0-20230919161904-206fa8ebd545/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
+github.com/streamingfast/dmetrics v0.0.0-20240214191810-524a5c58fbaa h1:PJkLMu6Own6V5qYwJDQHgRBCTTW2CxV4xxADMXfw+0M=
+github.com/streamingfast/dmetrics v0.0.0-20240214191810-524a5c58fbaa/go.mod h1:JbxEDbzWRG1dHdNIPrYfuPllEkktZMgm40AwVIBENcw=
 github.com/streamingfast/dstore v0.1.1-0.20240311181234-470a7a84936f h1:a7ANk6z1IiEMMUEV02Y5QoczDy/bOxeu9py5d3Kmw6E=
 github.com/streamingfast/dstore v0.1.1-0.20240311181234-470a7a84936f/go.mod h1:kNzxgv2MzYFn2T4kelBVpGp/yP/1njtr3+csWuqxK3w=
 github.com/streamingfast/logging v0.0.0-20210811175431-f3b44b61606a/go.mod h1:4GdqELhZOXj4xwc4IaBmzofzdErGynnaSzuzxy0ZIBo=
@@ -399,8 +399,8 @@ github.com/streamingfast/shutter v1.5.0 h1:NpzDYzj0HVpSiDJVO/FFSL6QIK/YKOxY0gJAt
 github.com/streamingfast/shutter v1.5.0/go.mod h1:B/T6efqdeMGbGwjzPS1ToXzYZI4kDzI5/u4I+7qbjY8=
 github.com/streamingfast/substreams v1.7.3 h1:V4YOJt4tAzivaLpC7nSVDdULMuczj7QfJUTyHAT2qkM=
 github.com/streamingfast/substreams v1.7.3/go.mod h1:ao5xpjglDohCmwzRUlJtTNGUn+nXGR2AXBnYQEbvQaI=
-github.com/streamingfast/substreams-sink v0.3.1 h1:d6nYOycVpLOyZG144KIHJDoixcWzVt5tY2OMITNePkA=
-github.com/streamingfast/substreams-sink v0.3.1/go.mod h1:nBPwmsjz+CV0HT5Vmp0XTiu+RjP8CbdhD5u+uC3lo84=
+github.com/streamingfast/substreams-sink v0.4.0 h1:sU/E9Q4zXTfKxaGUgQ4OMFC+/NBH5VdZx6SOcBVp7P0=
+github.com/streamingfast/substreams-sink v0.4.0/go.mod h1:wlF6pAQTBXQGA9k5R1yKg6enHdtXjz1pMlAs4lhZOac=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.4.0/go.mod h1:YvHI0jy2hoMjB+UWwv71VJQ9isScKT/TqJzVSSt89Yw=
 github.com/stretchr/objx v0.5.0/go.mod h1:Yh+to48EsGEfYuaHDzXPcE3xhTkx73EhmCGUpEOglKo=
