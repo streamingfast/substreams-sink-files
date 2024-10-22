@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "parquet/options.proto";
+
+package contract.v1;
+
+message Events {
+    repeated Swap swaps = 1;
+}
+
+message Swap {
+    option (parquet.table_name) = "swaps";
+
+    string evt_tx_hasher = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes sender = 5;
+    bytes recipient = 6;
+    string amount0 = 7;
+    string amount1 = 8;
+    string sqrt_price_x96 = 9;
+    string liquidity = 10;
+    int64 tick = 11 [(parquet.ignored) = true];
+}

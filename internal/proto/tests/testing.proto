@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+// The `sf.substreams.sink.files.v1` package can be use in your Substreams to defined a `map` module
+// whose output type will be one of the message defined in the package. The `substreams-sink-files`
+// binary will then consume your module's output to create the files containing your extracted data.
+//
+// The current package supports a single output format which is the `Lines` message which represents
+// a list of plain-text "line" that should be appended together in a single bundle.
+package sf.substreams.sink.files.testing;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/streamingfast/substreams-sink-files/internal/pb/testing;pbtesting";
+
+message Literals {
+    repeated Literal elements = 1;
+}
+
+message Literal {
+    string typeString = 1;
+    int32 typeInt32 = 2;
+    int64 typeInt64 = 3;
+    uint32 typeUint32 = 4;
+    uint64 typeUint64 = 5;
+    sint32 typeSint32 = 6;
+    sint64 typeSint64 = 7;
+    fixed32 typeFixed32 = 8;
+    fixed64 typeFixed64 = 9;
+    sfixed32 typeSfixed32 = 10;
+    sfixed64 typeSfixed64 = 11;
+    float typeFloat = 12;
+    double typeDouble = 13;
+    bool typeBool = 14;
+    bytes typeBytes = 15;
+
+    google.protobuf.Timestamp typeTimestamp = 16;
+}

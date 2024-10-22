@@ -23,7 +23,7 @@ func (l *LinesEncoder) EncodeTo(output *pbsubstreamsrpc.MapModuleOutput, writer 
 	// even create our own which should be quiter simpler and could even reduce allocations
 	lines := &pbsinkfiles.Lines{}
 	if err := proto.Unmarshal(output.GetMapOutput().Value, lines); err != nil {
-		return fmt.Errorf("failed to unmarhsall lines: %w", err)
+		return fmt.Errorf("failed to unmarhsal lines: %w", err)
 	}
 
 	for _, line := range lines.Lines {

@@ -5,15 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
-	"github.com/streamingfast/substreams-sink-files/state"
-
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-
-	"github.com/streamingfast/bstream"
 	sink "github.com/streamingfast/substreams-sink"
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
+	"github.com/streamingfast/substreams-sink-files/state"
 	"go.uber.org/zap"
 )
 
@@ -21,12 +19,10 @@ type Bundler struct {
 	*shutter.Shutter
 
 	blockCount     uint64
-	encoder        Encoder
 	stats          *boundaryStats
 	boundaryWriter writer.Writer
 	outputStore    dstore.Store
 	stateStore     state.Store
-	fileType       writer.FileType
 	activeBoundary *bstream.Range
 	uploadQueue    *dhammer.Nailer
 	zlogger        *zap.Logger
@@ -52,12 +48,6 @@ func New(
 
 	b.uploadQueue = dhammer.NewNailer(5, b.uploadBoundary, dhammer.NailerLogger(zlogger))
 
-	switch boundaryWriter.Type() {
-	case writer.FileTypeJSONL:
-		b.encoder = JSONLEncode
-	default:
-		return nil, fmt.Errorf("invalid file type %q", boundaryWriter.Type())
-	}
 	return b, nil
 }
 

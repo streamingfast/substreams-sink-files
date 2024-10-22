@@ -2,6 +2,7 @@ package writer
 
 import (
 	"fmt"
+
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 )
@@ -9,7 +10,8 @@ import (
 type FileType string
 
 const (
-	FileTypeJSONL FileType = "jsonl"
+	FileTypeJSONL   FileType = "jsonl"
+	FileTypeParquet FileType = "parquet"
 )
 
 type baseWriter struct {

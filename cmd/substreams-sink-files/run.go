@@ -21,11 +21,12 @@ import (
 	"github.com/streamingfast/substreams-sink-files/bundler"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/encoder"
+	"github.com/streamingfast/substreams-sink-files/protox"
 	"github.com/streamingfast/substreams-sink-files/state"
+	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
-
-// sync run ./localdata api.dev.eth.mainnet.com substrema.spkg map_transfers .transfers[]
 
 var SyncRunCmd = Command(syncRunE,
 	"run <endpoint> <manifest> <module> <output_store> [<start>:<stop>]",
@@ -37,7 +38,7 @@ var SyncRunCmd = Command(syncRunE,
 		flags.String("file-working-dir", "./localdata/working", "Working store where we accumulate data")
 		flags.String("state-store", "./state.yaml", "Output path where to store latest received cursor, if empty, cursor will not be persisted")
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
-		flags.String("encoder", "", "Sets which encoder to use to parse the Substreams Output Module data. Options are: 'lines', 'proto:<_proto_path_to_field>'")
+		flags.String("encoder", "", "Sets which encoder to use to parse the Substreams Output Module data. Options are: 'lines', 'parquet', 'proto:<_proto_path_to_field>'")
 		flags.Uint64("buffer-max-size", 64*1024*1024, FlagDescription(`
 			Amount of memory bytes to allocate to the buffered writer. If your data set is small enough that every is hold in memory, we are going to avoid
 			the local I/O operation(s) and upload accumulated content in memory directly to final storage location.
@@ -45,13 +46,13 @@ var SyncRunCmd = Command(syncRunE,
 			Ideally, you should set this as to about 80%% of RAM the process has access to. This will maximize amout of element in memory,
 			and reduce 'syscall' and I/O operations to write to the temporary file as we are buffering a lot of data.
 
-			This setting has probably the greatest impact on writting throughput.
+			This setting has probably the greatest impact on writing throughput.
 
 			Default value for the buffer is 64 MiB.
 		`))
 	}),
 	ExamplePrefixed("substreams-sink-files run",
-		"mainnet.eth.streaminfast.io:443 substreams.spkg map_transfers '.transfers[]' ./localdata",
+		"mainnet.eth.streamingfast.io:443 substreams.spkg map_transfers '.transfers[]' ./localdata",
 	),
 )
 
@@ -114,23 +115,51 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("new file state store: %w", err)
 	}
 
+	var boundaryWriter writer.Writer
+	var sinkEncoder encoder.Encoder
+
+	switch {
+	case encoderType == "lines" || strings.HasPrefix(encoderType, "proto:"):
+		boundaryWriter = writer.NewBufferedIO(bufferMaxSize, fileWorkingDir, writer.FileTypeJSONL, zlog)
+		sinkEncoder, err = getEncoder(encoderType, sinker)
+		if err != nil {
+			return fmt.Errorf("failed to create encoder: %w", err)
+		}
+
+	case encoderType == "parquet":
+		msgDesc, err := outputProtoreflectMessageDescriptor(sinker)
+		if err != nil {
+			return fmt.Errorf("output module message descriptor: %w", err)
+		}
+
+		// tables := protox.ParquetFindTablesInMessageDescriptor(msgDesc)
+
+		parquetWriter, err := writer.NewParquetWriter(msgDesc)
+		if err != nil {
+			return fmt.Errorf("new parquet writer: %w", err)
+		}
+
+		boundaryWriter = parquetWriter
+		sinkEncoder = encoder.EncoderFunc(func(output *pbsubstreamsrpc.MapModuleOutput, _ writer.Writer) error {
+			return parquetWriter.EncodeMapModule(output)
+		})
+
+	default:
+		return fmt.Errorf("unknown encoder type %q", encoderType)
+	}
+
 	bundler, err := bundler.New(
 		blocksPerFile,
-		writer.NewBufferedIO(bufferMaxSize, fileWorkingDir, writer.FileTypeJSONL, zlog),
+		boundaryWriter,
 		stateStore,
 		fileOutputStore,
 		zlog,
 	)
 	if err != nil {
-		return fmt.Errorf("new bunlder: %w", err)
+		return fmt.Errorf("new bundler: %w", err)
 	}
 
-	encoder, err := getEncoder(encoderType, sinker)
-	if err != nil {
-		return fmt.Errorf("failed to create encoder: %w", err)
-	}
-
-	fileSinker := substreamsfile.NewFileSinker(sinker, bundler, encoder, zlog, tracer)
+	fileSinker := substreamsfile.NewFileSinker(sinker, bundler, sinkEncoder, zlog, tracer)
 	fileSinker.OnTerminating(app.Shutdown)
 	app.OnTerminating(func(err error) {
 		zlog.Info("application terminating shutting down file sinker")
@@ -195,4 +224,18 @@ func outputMessageDescriptor(sinker *sink.Sinker) (*desc.MessageDescriptor, erro
 	}
 
 	return nil, fmt.Errorf("output module descriptor not found")
+}
+
+func outputProtoreflectMessageDescriptor(sinker *sink.Sinker) (protoreflect.MessageDescriptor, error) {
+	outputTypeName := protoreflect.FullName(sinker.OutputModuleTypeUnprefixed())
+	value, err := protox.FindMessageByNameInFiles(sinker.Package().ProtoFiles, outputTypeName)
+	if err != nil {
+		return nil, fmt.Errorf("find message by name in files: %w", err)
+	}
+
+	if value == nil {
+		return nil, fmt.Errorf("output module %q descriptor not found in proto files", outputTypeName)
+	}
+
+	return value, nil
 }

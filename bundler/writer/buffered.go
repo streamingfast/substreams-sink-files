@@ -79,7 +79,7 @@ func (s *BufferedIO) CloseBoundary(ctx context.Context) (Uploadeable, error) {
 		}, nil
 	}
 
-	s.zlogger.Info("flushing buffered writter")
+	s.zlogger.Info("flushing buffered writer")
 	if err := s.activeFile.writer.Flush(); err != nil {
 		return nil, fmt.Errorf("flushing buffered active writer: %w", err)
 	}
@@ -152,7 +152,7 @@ func (f *LazyFile) Close() error {
 }
 
 // memoryBufferedWriter has two goals. First, it knows if wrapped writer received
-// data or not. When no data has been receveid, it's possible to use this writer
+// data or not. When no data has been received, it's possible to use this writer
 // to retrieve the content being written to it to a memory buffer.
 //
 // In expected case where we are controlled by an IntelligentWriter, no memory allocation
@@ -195,14 +195,14 @@ func (f *memoryBufferedWriter) Close() error {
 
 // NewIntelligentWriterSize is intelligent because it tracks if data was ever
 // written to the temporary file or not. If everything entered the buffer fit in memory,
-// we can nicely optimze away the full I/O operation and avoid all the cost of it.
+// we can nicely optimize away the full I/O operation and avoid all the cost of it.
 //
 // Operators should specify a buffer as large as they are willing to pay for RAM (
 // leaving a buffer for "normal" operations of the process).
 func NewIntelligentWriterSize(w io.Writer, size int) *IntelligentWriter {
-	underlyingWritter := newMemoryBufferedWriter(w)
+	underlyingWriter := newMemoryBufferedWriter(w)
 
-	return &IntelligentWriter{Writer: bufio.NewWriterSize(underlyingWritter, size), underlyingWritter: underlyingWritter}
+	return &IntelligentWriter{Writer: bufio.NewWriterSize(underlyingWriter, size), underlyingWriter: underlyingWriter}
 }
 
 // NewIntelligentWriter returns a new IntelligentWriter whose buffer has the default size.
@@ -213,7 +213,7 @@ func NewIntelligentWriter(w io.Writer) *IntelligentWriter {
 }
 
 func (w *IntelligentWriter) AllDataFitInMemory() bool {
-	return !w.underlyingWritter.WrittenToWrapped
+	return !w.underlyingWriter.WrittenToWrapped
 }
 
 func (w *IntelligentWriter) MemoryData() []byte {
@@ -221,14 +221,14 @@ func (w *IntelligentWriter) MemoryData() []byte {
 		panic(fmt.Errorf("it's invalid to call MemoryData without checking if all data is held in memory, check AllDataFitInMemory prior calling this method"))
 	}
 
-	// It's a bit convoluated here because `bufio.Writer` does not give
+	// It's a bit convoluted here because `bufio.Writer` does not give
 	// direct access to underlying buffer. So we need to make some weird
 	// steps to access the buffered data without an allocation.
 	//
 	// The trick here is to use `Flush` primitive, we know the data is fully
 	// in memory at this point. Implementation of `Flush` on `bufio.Writer` calls
 	// the wrapped writer directly with the `writ.Write(b.buf[0:n])` where b is
-	// `bufio.Writer` private inacessible buffer and `n` is amount of data
+	// `bufio.Writer` private inaccessible buffer and `n` is amount of data
 	// buffered. You can see in the invocation of `Write` that it passes his private
 	// buffer straight. This means the writer's `Write` method will receive this
 	// "private" buffer.
@@ -236,7 +236,7 @@ func (w *IntelligentWriter) MemoryData() []byte {
 	// Now, we need to hijack `Write` somehow. For this, we have created
 	// `memoryBufferedWriter` struct. This special writer has a mode that when activated,
 	// subsequent calls to `Write` records the received buffer in memory.
-	w.underlyingWritter.NextWritesToMemory = true
+	w.underlyingWriter.NextWritesToMemory = true
 
 	// Final step is to call `Flush` which triggers ours specialized
 	// `memoryBufferedWriter.Write(b.buf[0:n])` and which will reach which itself
@@ -246,13 +246,13 @@ func (w *IntelligentWriter) MemoryData() []byte {
 		panic(fmt.Errorf("this should have been infallible because we write directly received 'b.buf[0:n]', there is a flaw in our logic: %w", err))
 	}
 
-	return w.underlyingWritter.MemoryBuffer
+	return w.underlyingWriter.MemoryBuffer
 }
 
 type IntelligentWriter struct {
 	*bufio.Writer
 
-	underlyingWritter *memoryBufferedWriter
+	underlyingWriter *memoryBufferedWriter
 }
 
 const (
@@ -260,13 +260,10 @@ const (
 )
 
 type bufferedActiveFile struct {
-	lazyFile *LazyFile
-	writer   *IntelligentWriter
-	// fileWriter      io.Writer
-	blockRange *bstream.Range
-	// workingFilename string
+	lazyFile       *LazyFile
+	writer         *IntelligentWriter
+	blockRange     *bstream.Range
 	outputFilename string
-	// err             error
 }
 
 func (f *bufferedActiveFile) Path() string {

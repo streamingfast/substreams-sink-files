@@ -31,6 +31,9 @@ function main() {
   echo "generate.sh - `date` - `whoami`" > $ROOT/pb/last_generate.txt
   echo "streamingfast/substreams-sink-files revision: `GIT_DIR=$ROOT/.git git rev-parse HEAD`" >> $ROOT/pb/last_generate.txt
 
+  pushd "$ROOT/internal"
+  buf generate proto
+
   echo "Done"
 }
 

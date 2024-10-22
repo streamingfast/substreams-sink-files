@@ -1,0 +1,40 @@
+specVersion: v0.1.0
+package:
+  name: uniswap_swap_eth_usdc
+  version: v0.1.0
+
+imports:
+  eth: https://spkg.io/streamingfast/ethereum-common-v0.3.0.spkg
+
+protobuf:
+  files:
+    - contract.proto
+    - parquet/options.proto
+  importPaths:
+    - ./proto
+    - ../../proto
+  excludePaths:
+    - google
+    - sf/ethereum
+    - sf/substreams/index
+    - sf/substreams/sink
+    - sf/substreams/rpc
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/substreams.wasm
+
+modules:
+  - name: map_events
+    kind: map
+    initialBlock: 12376729
+    inputs:
+      - source: sf.substreams.v1.Clock
+      - map: eth:filtered_events
+    output:
+      type: proto:contract.v1.Events
+
+network: mainnet
+params:
+  eth:filtered_events: evt_addr:0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640

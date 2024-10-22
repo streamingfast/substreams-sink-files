@@ -2,10 +2,10 @@ package writer
 
 import (
 	"context"
-	"github.com/streamingfast/dstore"
 	"io"
 
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dstore"
 )
 
 type Writer interface {
@@ -18,4 +18,10 @@ type Writer interface {
 
 type Uploadeable interface {
 	Upload(ctx context.Context, store dstore.Store) (string, error)
+}
+
+type UploadeableFunc func(ctx context.Context, store dstore.Store) (string, error)
+
+func (f UploadeableFunc) Upload(ctx context.Context, store dstore.Store) (string, error) {
+	return f(ctx, store)
 }

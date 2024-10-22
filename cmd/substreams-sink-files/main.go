@@ -29,6 +29,10 @@ func main() {
 		ConfigureViper("SINK_FILES"),
 		ConfigureVersion(version),
 
+		Group("tools", "Tools related to Substreams sink files",
+			ToolsParquet,
+		),
+
 		PersistentFlags(func(flags *pflag.FlagSet) {
 			flags.Duration("delay-before-start", 0, "[Operator] Amount of time to wait before starting any internal processes, can be used to perform to maintenance on the pod before actually letting it starts")
 			flags.String("metrics-listen-addr", "localhost:9102", "[Operator] If non-empty, the process will listen on this address for Prometheus metrics request(s)")
