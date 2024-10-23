@@ -10,7 +10,7 @@ import (
 	"github.com/streamingfast/cli"
 	. "github.com/streamingfast/cli"
 	sink "github.com/streamingfast/substreams-sink"
-	"github.com/streamingfast/substreams-sink-files/protox"
+	"github.com/streamingfast/substreams-sink-files/parquetx"
 )
 
 var ToolsParquet = Group("parquet", "Parquet related tools",
@@ -44,7 +44,7 @@ func toolsParquetSchemaE(cmd *cobra.Command, args []string) error {
 	descriptor, err := outputProtoreflectMessageDescriptor(sinker)
 	cli.NoError(err, "Failed to extract message descriptor from output module")
 
-	tables := protox.ParquetFindTablesInMessageDescriptor(descriptor)
+	tables, _ := parquetx.FindTablesInMessageDescriptor(descriptor)
 	if len(tables) == 0 {
 		fmt.Printf("No tables found or inferred in message descriptor %q\n", descriptor.FullName())
 		os.Exit(1)

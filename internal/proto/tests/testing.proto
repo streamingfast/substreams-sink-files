@@ -67,6 +67,9 @@ message Row {
     bytes typeBytes = 15;
 
     google.protobuf.Timestamp typeTimestamp = 16;
+
+    // Ensure ignored is correctly implemented
+    bool ignored = 64 [(parquet.ignored) = true];
 }
 
 // Kept in sync with the Row message, we use RowT to test the parquet.table_name option
@@ -90,4 +93,7 @@ message RowT {
     bytes typeBytes = 15;
 
     google.protobuf.Timestamp typeTimestamp = 16;
+
+    // Ensure ignored is correctly implemented
+    bool ignored = 64 [(parquet.ignored) = true];
 }

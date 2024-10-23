@@ -142,38 +142,44 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 	messageDesc := message.Descriptor()
 	fields := messageDesc.Fields()
 
-	columns := make([]parquet.Value, fields.Len())
+	// We preallocate the columns slice to the maximum number of fields, but we might skip some
+	// fields if they are ignored.
+	columns := make([]parquet.Value, 0, fields.Len())
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
+		if IsFieldIgnored(field) {
+			continue
+		}
+
 		value := message.Get(field)
 
 		switch field.Kind() {
 		case protoreflect.BoolKind:
-			columns[i] = parquet.BooleanValue(value.Bool())
+			columns = append(columns, parquet.BooleanValue(value.Bool()))
 		case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
-			columns[i] = parquet.Int32Value(int32(value.Int()))
+			columns = append(columns, parquet.Int32Value(int32(value.Int())))
 		case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
-			columns[i] = parquet.Int64Value(value.Int())
+			columns = append(columns, parquet.Int64Value(value.Int()))
 		case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
-			columns[i] = parquet.Int32Value(int32(value.Uint()))
+			columns = append(columns, parquet.Int32Value(int32(value.Uint())))
 		case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-			columns[i] = parquet.Int64Value(int64(value.Uint()))
+			columns = append(columns, parquet.Int64Value(int64(value.Uint())))
 		case protoreflect.FloatKind:
-			columns[i] = parquet.FloatValue(float32(value.Float()))
+			columns = append(columns, parquet.FloatValue(float32(value.Float())))
 		case protoreflect.DoubleKind:
-			columns[i] = parquet.DoubleValue(value.Float())
+			columns = append(columns, parquet.DoubleValue(value.Float()))
 		case protoreflect.StringKind:
-			columns[i] = parquet.ByteArrayValue([]byte(value.String()))
+			columns = append(columns, parquet.ByteArrayValue([]byte(value.String())))
 		case protoreflect.BytesKind:
-			columns[i] = parquet.ByteArrayValue(value.Bytes())
+			columns = append(columns, parquet.ByteArrayValue(value.Bytes()))
 
 		case protoreflect.MessageKind:
 			if protox.IsWellKnownTimestampField(field) {
-				columns[i] = parquet.Int64Value(protox.DynamicAsTimestampTime(value.Message()).UnixNano())
+				columns = append(columns, parquet.Int64Value(protox.DynamicAsTimestampTime(value.Message()).UnixNano()))
 				continue
 			}
 
-			columns[i] = parquet.ValueOf(value.Interface())
+			columns = append(columns, parquet.ValueOf(value.Interface()))
 
 		default:
 			return nil, fmt.Errorf("field %s is of type %s which isn't supported yet", field.FullName(), field.Kind())
