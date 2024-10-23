@@ -1,9 +1,5 @@
-version: v1
-managed:
-  # We are now using managed mode for now because I did not find how to support `;pbsubstreams` package
-  # which we use currently.
-  enabled: false
+version: v2
 plugins:
-  - name: go
+  - remote: buf.build/protocolbuffers/go:v1.28.1
     out: pb
     opt: paths=source_relative

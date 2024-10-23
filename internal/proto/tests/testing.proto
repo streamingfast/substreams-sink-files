@@ -9,14 +9,70 @@ syntax = "proto3";
 package sf.substreams.sink.files.testing;
 
 import "google/protobuf/timestamp.proto";
+import "parquet/options.proto";
 
 option go_package = "github.com/streamingfast/substreams-sink-files/internal/pb/testing;pbtesting";
 
-message Literals {
-    repeated Literal elements = 1;
+message SingleRepeated {
+    repeated Row elements = 1;
 }
 
-message Literal {
+message MultipleRepeated {
+    repeated Row table_a = 1;
+    repeated Row table_b = 2;
+    repeated Row table_c = 3;
+}
+
+message FromTablesFlat {
+    RowT row = 1;
+}
+
+message FromTablesRepeated {
+    // Named elements to ensure that tables is still `rows` as defined in RowT parquet.table_name
+    repeated RowT elements = 1;
+}
+
+message FromTablesNestedFlat {
+    NestedFlat nested = 1;
+}
+
+message FromTablesNestedRepeated {
+    NestedRepeated nested = 1;
+}
+
+message NestedFlat {
+    RowT row = 1;
+}
+
+message NestedRepeated {
+    repeated RowT elements = 1;
+}
+
+// Keep in sync with the RowT below, they must be kept in sync for tests to work properly
+message Row {
+    string typeString = 1;
+    int32 typeInt32 = 2;
+    int64 typeInt64 = 3;
+    uint32 typeUint32 = 4;
+    uint64 typeUint64 = 5;
+    sint32 typeSint32 = 6;
+    sint64 typeSint64 = 7;
+    fixed32 typeFixed32 = 8;
+    fixed64 typeFixed64 = 9;
+    sfixed32 typeSfixed32 = 10;
+    sfixed64 typeSfixed64 = 11;
+    float typeFloat = 12;
+    double typeDouble = 13;
+    bool typeBool = 14;
+    bytes typeBytes = 15;
+
+    google.protobuf.Timestamp typeTimestamp = 16;
+}
+
+// Kept in sync with the Row message, we use RowT to test the parquet.table_name option
+message RowT {
+    option (parquet.table_name) = "rows";
+
     string typeString = 1;
     int32 typeInt32 = 2;
     int64 typeInt64 = 3;

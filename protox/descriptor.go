@@ -4,11 +4,15 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/streamingfast/logging"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
+
+var zlog, tracer = logging.PackageLogger("protox", "github.com/streamingfast/substreams-sink-files")
 
 // FindMessageByNameInFiles finds a message descriptor by name in a list of file descriptors. It returns nil if the
 // message is not found.
@@ -90,4 +94,56 @@ func MessageRepeatedFieldNames(descriptor protoreflect.MessageDescriptor) (field
 	}
 
 	return
+}
+
+// WalkMessageDescriptors walks the message descriptors tree starting from the root message descriptor. It calls the
+// `onChild` function for each child message descriptor.
+//
+// The function stops recursion if the same node is visited more than once.
+//
+// It follows the fields message recursively and also the repeated fields that are messages.
+func WalkMessageDescriptors(root protoreflect.MessageDescriptor, onChild func(onChild protoreflect.MessageDescriptor)) {
+	seenNodes := make(map[protoreflect.FullName]bool, 0)
+
+	var inner func(node protoreflect.MessageDescriptor)
+	inner = func(node protoreflect.MessageDescriptor) {
+		if exists := seenNodes[node.FullName()]; exists {
+			// Stop recursion if we already visited this node
+			return
+		}
+
+		seenNodes[node.FullName()] = true
+		if tracer.Enabled() {
+			zlog.Debug("walking message descriptor", zap.String("message", string(node.FullName())))
+		}
+
+		fields := node.Fields()
+		for i := 0; i < fields.Len(); i++ {
+			field := fields.Get(i)
+
+			if tracer.Enabled() {
+				zlog.Debug("message field descriptor",
+					zap.String("field", string(field.FullName())),
+					zap.String("kind", field.Kind().String()),
+					zap.Bool("is_list", field.IsList()),
+				)
+			}
+
+			if field.Kind() != protoreflect.MessageKind && !field.IsList() {
+				continue
+			}
+
+			message := field.Message()
+			if message == nil {
+				// This can happen if field is `repeated string` (or any primitive), `Message()` returns `nil` in those cases
+				continue
+			}
+
+			onChild(message)
+			inner(message)
+			continue
+		}
+	}
+
+	inner(root)
 }

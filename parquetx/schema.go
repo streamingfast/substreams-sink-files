@@ -1,4 +1,4 @@
-package protox
+package parquetx
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/iancoleman/strcase"
 	"github.com/parquet-go/parquet-go"
 	"github.com/parquet-go/parquet-go/compress"
 	"github.com/parquet-go/parquet-go/compress/uncompressed"
@@ -14,6 +15,7 @@ import (
 	"github.com/parquet-go/parquet-go/encoding"
 	"github.com/parquet-go/parquet-go/format"
 	parquetpb "github.com/streamingfast/substreams-sink-files/pb/parquet"
+	"github.com/streamingfast/substreams-sink-files/protox"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -25,94 +27,101 @@ var (
 	Uncompressed = &uncompressed.Codec{}
 )
 
-func ParquetSchemaFromMessageDescriptor(descriptor protoreflect.MessageDescriptor) *parquet.Schema {
+func SchemaFromMessageDescriptor(descriptor protoreflect.MessageDescriptor) *parquet.Schema {
 	return parquet.NewSchema(string(descriptor.Name()), newMessageNode(descriptor))
 }
 
-type ParquetTableResult struct {
+type TableResult struct {
 	Descriptor protoreflect.MessageDescriptor
 	Schema     *parquet.Schema
 }
 
-func parquetTableResult(descriptor protoreflect.MessageDescriptor, schema *parquet.Schema) ParquetTableResult {
-	return ParquetTableResult{
+func tableResult(descriptor protoreflect.MessageDescriptor, schema *parquet.Schema) TableResult {
+	return TableResult{
 		Descriptor: descriptor,
 		Schema:     schema,
 	}
 }
 
-func ParquetFindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor) (out []ParquetTableResult) {
-	walkMessage(descriptor, func(child protoreflect.MessageDescriptor) {
-		options, hasOptions := child.Options().(*descriptorpb.MessageOptions)
-		if !hasOptions || options == nil {
-			return
+func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor) (out []TableResult, rowExtractor ProtoRowExtractor) {
+	protox.WalkMessageDescriptors(descriptor, func(child protoreflect.MessageDescriptor) {
+		if tableName, hasTableName := GetMessageTableName(child); hasTableName {
+			// We've got `option (parquet.table_name)` set, let's create a table for it
+			out = append(out, tableResult(
+				child,
+				parquet.NewSchema(tableName, newMessageNode(child)),
+			))
 		}
-
-		tableName := proto.GetExtension(options, parquetpb.E_TableName).(string)
-		if tableName == "" {
-			return
-		}
-
-		// We've got `option (parquet.table_name)` set, let's create a table for it
-		out = append(out, parquetTableResult(child, parquet.NewSchema(tableName, newMessageNode(child))))
 	})
 
 	// If we found any specific tables, we stop there
 	if len(out) > 0 {
-		return out
+		return out, ProtoRowExtractorFromTables(out)
 	}
 
 	// Otherwise, let's support the case to pickup each repeated fields as a table
-	repeatedFieldCount := MessageRepeatedFieldCount(descriptor)
+	repeatedFieldCount := protox.MessageRepeatedFieldCount(descriptor)
 
 	// There is no repeated fields, assume we have a 1:1 mapping between a block and a row, use the message as-is
 	if repeatedFieldCount == 0 {
-		return []ParquetTableResult{parquetTableResult(descriptor, parquet.NewSchema(string(descriptor.Name()), newMessageNode(descriptor)))}
+		tableName := strcase.ToSnake(string(descriptor.Name()))
+
+		return []TableResult{
+			tableResult(
+				descriptor,
+				parquet.NewSchema(tableName, newMessageNode(descriptor)),
+			),
+		}, ProtoRowExtractorFromRoot(tableName)
 	}
 
 	// We skip fields that are repeated of primitive types for now
-	for _, field := range FindMessageRepeatedFields(descriptor) {
+	repeatedFields := map[string]protoreflect.FieldDescriptor{}
+	for _, field := range protox.FindMessageRepeatedFields(descriptor) {
+		if IsFieldIgnored(field) {
+			continue
+		}
+
 		if field.Message() == nil {
 			// It means we are dealing with a `repeated <primitive>` type like list of string which we don't support
 			continue
 		}
 
-		tableName := field.JSONName()
-		out = append(out, parquetTableResult(field.Message(), parquet.NewSchema(tableName, newMessageNode(field.Message()))))
+		tableName := strcase.ToSnake(field.JSONName())
+		out = append(out, tableResult(
+			field.Message(),
+			parquet.NewSchema(tableName, newMessageNode(field.Message())),
+		))
+
+		repeatedFields[tableName] = field
 	}
 
-	return out
+	return out, ProtoRowExtractorFromRepeatedFields(repeatedFields)
 }
 
-func walkMessage(root protoreflect.MessageDescriptor, onChild func(onChild protoreflect.MessageDescriptor)) {
-	seenNodes := make(map[protoreflect.FullName]bool, 0)
-
-	var inner func(node protoreflect.MessageDescriptor)
-	inner = func(node protoreflect.MessageDescriptor) {
-		if exists := seenNodes[node.FullName()]; exists {
-			// Stop recursion if we already visited this node
-			return
-		}
-
-		seenNodes[node.FullName()] = true
-
-		fields := node.Fields()
-		for i := 0; i < fields.Len(); i++ {
-			field := fields.Get(i)
-			if field.Kind() == protoreflect.MessageKind {
-				onChild(field.Message())
-				inner(node)
-				continue
-			}
-
-			if field.IsList() && field.Message() != nil {
-				onChild(field.Message())
-				inner(node)
-			}
-		}
+func GetMessageTableName(descriptor protoreflect.MessageDescriptor) (string, bool) {
+	options, hasOptions := descriptor.Options().(*descriptorpb.MessageOptions)
+	if !hasOptions || options == nil {
+		return "", false
 	}
 
-	inner(root)
+	if !proto.HasExtension(options, parquetpb.E_TableName) {
+		return "", false
+	}
+
+	return proto.GetExtension(options, parquetpb.E_TableName).(string), true
+}
+
+func IsFieldIgnored(field protoreflect.FieldDescriptor) bool {
+	options, hasOptions := field.Options().(*descriptorpb.FieldOptions)
+	if !hasOptions || options == nil {
+		return false
+	}
+
+	if !proto.HasExtension(options, parquetpb.E_Ignored) {
+		return false
+	}
+
+	return proto.GetExtension(options, parquetpb.E_Ignored).(bool)
 }
 
 var _ parquet.Node = (*messageNode)(nil)
@@ -177,7 +186,7 @@ func protoreflectKindToParquetNode(field protoreflect.FieldDescriptor) parquet.N
 		return parquet.Enum()
 
 	case protoreflect.MessageKind:
-		if IsWellKnownTimestampField(field) {
+		if protox.IsWellKnownTimestampField(field) {
 			return parquet.Timestamp(parquet.Nanosecond)
 		}
 

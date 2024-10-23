@@ -31,8 +31,12 @@ function main() {
   echo "generate.sh - `date` - `whoami`" > $ROOT/pb/last_generate.txt
   echo "streamingfast/substreams-sink-files revision: `GIT_DIR=$ROOT/.git git rev-parse HEAD`" >> $ROOT/pb/last_generate.txt
 
+  if ! command -v protoc-gen-go &> /dev/null; then
+      go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+  fi
+
   pushd "$ROOT/internal"
-  buf generate proto
+  protoc -I=./proto -I=../proto --go_out=paths=source_relative:./pb tests/testing.proto
 
   echo "Done"
 }
