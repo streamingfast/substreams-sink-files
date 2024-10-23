@@ -177,6 +177,26 @@ func TestParquetWriter(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "from parquet tables, repeated field and one repeated ignored",
+			outputModules: []proto.Message{
+				&pbtesting.FromTablesRepeatedWithIgnore{
+					Ignored: []*pbtesting.IgnoredRow{
+						{Id: "ignored-0"},
+					},
+					Elements: []*pbtesting.RowT{
+						testProtobufRowT(0),
+						testProtobufRowT(1),
+					},
+				},
+			},
+			expectedRows: map[string][]GoRow{
+				"rows": {
+					testGoRow(0),
+					testGoRow(1),
+				},
+			},
+		},
 	}
 
 	for _, testCase := range cases {

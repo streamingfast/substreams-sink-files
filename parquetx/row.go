@@ -5,6 +5,7 @@ import (
 
 	"github.com/parquet-go/parquet-go"
 	"github.com/streamingfast/substreams-sink-files/protox"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -32,9 +33,24 @@ func ProtoRowExtractorFromTables(tables []TableResult) ProtoRowExtractor {
 
 		var processNode func(node protoreflect.Message) error
 		processNode = func(node protoreflect.Message) error {
+			if tracer.Enabled() {
+				zlog.Debug("walking value", zap.String("message", string(node.Descriptor().FullName())))
+			}
+
 			fields := node.Descriptor().Fields()
 			for i := 0; i < fields.Len(); i++ {
 				field := fields.Get(i)
+				ignored := IsFieldIgnored(field)
+
+				if tracer.Enabled() {
+					zlog.Debug("value field descriptor",
+						zap.String("field", string(field.FullName())),
+						zap.String("kind", field.Kind().String()),
+						zap.Bool("is_list", field.IsList()),
+						zap.Bool("ignored", ignored),
+					)
+				}
+
 				if IsFieldIgnored(field) {
 					continue
 				}
@@ -77,10 +93,23 @@ func ProtoRowExtractorFromTables(tables []TableResult) ProtoRowExtractor {
 					continue
 				}
 
-				// Recurse into the message if message was not found in the tables in is not a list
-				if err := processNode(node.Get(field).Message()); err != nil {
-					// Propagate the error up
-					return err
+				if field.IsList() {
+					list := node.Get(field).List()
+					for i := 0; i < list.Len(); i++ {
+						// FIXME: Is it possible to have `repeated repeated X`, I think Protobuf does not allow that
+
+						// Recurse into the message if message was not found in the tables in is not a list
+						if err := processNode(list.Get(i).Message()); err != nil {
+							// Propagate the error up
+							return err
+						}
+					}
+				} else {
+					// Recurse into the message if message was not found in the tables in is not a list
+					if err := processNode(node.Get(field).Message()); err != nil {
+						// Propagate the error up
+						return err
+					}
 				}
 			}
 

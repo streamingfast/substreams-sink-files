@@ -4,15 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
-
-var zlog, tracer = logging.PackageLogger("protox", "github.com/streamingfast/substreams-sink-files")
 
 // FindMessageByNameInFiles finds a message descriptor by name in a list of file descriptors. It returns nil if the
 // message is not found.

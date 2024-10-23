@@ -4,15 +4,112 @@ import "google/protobuf/timestamp.proto";
 import "parquet/options.proto";
 
 package contract.v1;
-
 message Events {
-    repeated Swap swaps = 1;
+    repeated EthUsdcPool_Burn eth_usdc_pool_burns = 1;
+    repeated EthUsdcPool_Collect eth_usdc_pool_collects = 2;
+    repeated EthUsdcPool_CollectProtocol eth_usdc_pool_collect_protocols = 3;
+    repeated EthUsdcPool_Flash eth_usdc_pool_flashes = 4;
+    repeated EthUsdcPool_IncreaseObservationCardinalityNext eth_usdc_pool_increase_observation_cardinality_nexts = 5;
+    repeated EthUsdcPool_Initialize eth_usdc_pool_initializes = 6;
+    repeated EthUsdcPool_Mint eth_usdc_pool_mints = 7;
+    repeated EthUsdcPool_SetFeeProtocol eth_usdc_pool_set_fee_protocols = 8;
+    repeated EthUsdcPool_Swap eth_usdc_pool_swaps = 9;
 }
+message EthUsdcPool_Burn {
+    option (parquet.table_name) = "burns";
 
-message Swap {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    int64 tick_lower = 6;
+    int64 tick_upper = 7;
+    string amount = 8;
+    string amount0 = 9;
+    string amount1 = 10;
+}
+message EthUsdcPool_Collect {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes owner = 5;
+    bytes recipient = 6;
+    int64 tick_lower = 7;
+    int64 tick_upper = 8;
+    string amount0 = 9;
+    string amount1 = 10;
+}
+message EthUsdcPool_CollectProtocol {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes sender = 5;
+    bytes recipient = 6;
+    string amount0 = 7;
+    string amount1 = 8;
+}
+message EthUsdcPool_Flash {
+    option (parquet.table_name) = "flashes";
+
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes sender = 5;
+    bytes recipient = 6;
+    string amount0 = 7;
+    string amount1 = 8;
+    string paid0 = 9;
+    string paid1 = 10;
+}
+message EthUsdcPool_IncreaseObservationCardinalityNext {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    uint64 observation_cardinality_next_old = 5;
+    uint64 observation_cardinality_next_new = 6;
+}
+message EthUsdcPool_Initialize {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    string sqrt_price_x96 = 5;
+    int64 tick = 6;
+}
+message EthUsdcPool_Mint {
+    option (parquet.table_name) = "mints";
+
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    bytes sender = 5;
+    bytes owner = 6;
+    int64 tick_lower = 7;
+    int64 tick_upper = 8;
+    string amount = 9;
+    string amount0 = 10;
+    string amount1 = 11;
+}
+message EthUsdcPool_SetFeeProtocol {
+    string evt_tx_hash = 1;
+    uint32 evt_index = 2;
+    google.protobuf.Timestamp evt_block_time = 3;
+    uint64 evt_block_number = 4;
+    uint64 fee_protocol0_old = 5;
+    uint64 fee_protocol1_old = 6;
+    uint64 fee_protocol0_new = 7;
+    uint64 fee_protocol1_new = 8;
+}
+message EthUsdcPool_Swap {
     option (parquet.table_name) = "swaps";
 
-    string evt_tx_hasher = 1;
+    string evt_tx_hash = 1;
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;
     uint64 evt_block_number = 4;
@@ -22,5 +119,5 @@ message Swap {
     string amount1 = 8;
     string sqrt_price_x96 = 9;
     string liquidity = 10;
-    int64 tick = 11 [(parquet.ignored) = true];
+    int64 tick = 11;
 }

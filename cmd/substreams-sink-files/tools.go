@@ -70,7 +70,7 @@ func toolsParquetSchemaE(cmd *cobra.Command, args []string) error {
 			fmt.Println()
 		}
 
-		fmt.Println(centerString(" Message "+string(table.Descriptor.FullName())+" ", longuestLine))
+		fmt.Println(centerString(" Table from "+string(table.Descriptor.FullName())+" ", longuestLine))
 		fmt.Println(strings.ReplaceAll(table.Schema.String(), "\t", "    "))
 		fmt.Println(strings.Repeat("-", longuestLine))
 	}

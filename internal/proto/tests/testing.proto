@@ -32,6 +32,11 @@ message FromTablesRepeated {
     repeated RowT elements = 1;
 }
 
+message FromTablesRepeatedWithIgnore {
+    repeated RowT elements = 1;
+    repeated IgnoredRow ignored = 2;
+}
+
 message FromTablesNestedFlat {
     NestedFlat nested = 1;
 }
@@ -96,4 +101,8 @@ message RowT {
 
     // Ensure ignored is correctly implemented
     bool ignored = 64 [(parquet.ignored) = true];
+}
+
+message IgnoredRow {
+    string id = 1;
 }

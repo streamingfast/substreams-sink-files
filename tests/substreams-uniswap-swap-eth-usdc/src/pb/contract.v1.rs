@@ -4,13 +4,199 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Events {
     #[prost(message, repeated, tag="1")]
-    pub swaps: ::prost::alloc::vec::Vec<Swap>,
+    pub eth_usdc_pool_burns: ::prost::alloc::vec::Vec<EthUsdcPoolBurn>,
+    #[prost(message, repeated, tag="2")]
+    pub eth_usdc_pool_collects: ::prost::alloc::vec::Vec<EthUsdcPoolCollect>,
+    #[prost(message, repeated, tag="3")]
+    pub eth_usdc_pool_collect_protocols: ::prost::alloc::vec::Vec<EthUsdcPoolCollectProtocol>,
+    #[prost(message, repeated, tag="4")]
+    pub eth_usdc_pool_flashes: ::prost::alloc::vec::Vec<EthUsdcPoolFlash>,
+    #[prost(message, repeated, tag="5")]
+    pub eth_usdc_pool_increase_observation_cardinality_nexts: ::prost::alloc::vec::Vec<EthUsdcPoolIncreaseObservationCardinalityNext>,
+    #[prost(message, repeated, tag="6")]
+    pub eth_usdc_pool_initializes: ::prost::alloc::vec::Vec<EthUsdcPoolInitialize>,
+    #[prost(message, repeated, tag="7")]
+    pub eth_usdc_pool_mints: ::prost::alloc::vec::Vec<EthUsdcPoolMint>,
+    #[prost(message, repeated, tag="8")]
+    pub eth_usdc_pool_set_fee_protocols: ::prost::alloc::vec::Vec<EthUsdcPoolSetFeeProtocol>,
+    #[prost(message, repeated, tag="9")]
+    pub eth_usdc_pool_swaps: ::prost::alloc::vec::Vec<EthUsdcPoolSwap>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Swap {
+pub struct EthUsdcPoolBurn {
     #[prost(string, tag="1")]
-    pub evt_tx_hasher: ::prost::alloc::string::String,
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(bytes="vec", tag="5")]
+    pub owner: ::prost::alloc::vec::Vec<u8>,
+    #[prost(int64, tag="6")]
+    pub tick_lower: i64,
+    #[prost(int64, tag="7")]
+    pub tick_upper: i64,
+    #[prost(string, tag="8")]
+    pub amount: ::prost::alloc::string::String,
+    #[prost(string, tag="9")]
+    pub amount0: ::prost::alloc::string::String,
+    #[prost(string, tag="10")]
+    pub amount1: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolCollect {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(bytes="vec", tag="5")]
+    pub owner: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes="vec", tag="6")]
+    pub recipient: ::prost::alloc::vec::Vec<u8>,
+    #[prost(int64, tag="7")]
+    pub tick_lower: i64,
+    #[prost(int64, tag="8")]
+    pub tick_upper: i64,
+    #[prost(string, tag="9")]
+    pub amount0: ::prost::alloc::string::String,
+    #[prost(string, tag="10")]
+    pub amount1: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolCollectProtocol {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(bytes="vec", tag="5")]
+    pub sender: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes="vec", tag="6")]
+    pub recipient: ::prost::alloc::vec::Vec<u8>,
+    #[prost(string, tag="7")]
+    pub amount0: ::prost::alloc::string::String,
+    #[prost(string, tag="8")]
+    pub amount1: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolFlash {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(bytes="vec", tag="5")]
+    pub sender: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes="vec", tag="6")]
+    pub recipient: ::prost::alloc::vec::Vec<u8>,
+    #[prost(string, tag="7")]
+    pub amount0: ::prost::alloc::string::String,
+    #[prost(string, tag="8")]
+    pub amount1: ::prost::alloc::string::String,
+    #[prost(string, tag="9")]
+    pub paid0: ::prost::alloc::string::String,
+    #[prost(string, tag="10")]
+    pub paid1: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolIncreaseObservationCardinalityNext {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(uint64, tag="5")]
+    pub observation_cardinality_next_old: u64,
+    #[prost(uint64, tag="6")]
+    pub observation_cardinality_next_new: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolInitialize {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(string, tag="5")]
+    pub sqrt_price_x96: ::prost::alloc::string::String,
+    #[prost(int64, tag="6")]
+    pub tick: i64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolMint {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(bytes="vec", tag="5")]
+    pub sender: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes="vec", tag="6")]
+    pub owner: ::prost::alloc::vec::Vec<u8>,
+    #[prost(int64, tag="7")]
+    pub tick_lower: i64,
+    #[prost(int64, tag="8")]
+    pub tick_upper: i64,
+    #[prost(string, tag="9")]
+    pub amount: ::prost::alloc::string::String,
+    #[prost(string, tag="10")]
+    pub amount0: ::prost::alloc::string::String,
+    #[prost(string, tag="11")]
+    pub amount1: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolSetFeeProtocol {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
+    #[prost(uint32, tag="2")]
+    pub evt_index: u32,
+    #[prost(message, optional, tag="3")]
+    pub evt_block_time: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(uint64, tag="4")]
+    pub evt_block_number: u64,
+    #[prost(uint64, tag="5")]
+    pub fee_protocol0_old: u64,
+    #[prost(uint64, tag="6")]
+    pub fee_protocol1_old: u64,
+    #[prost(uint64, tag="7")]
+    pub fee_protocol0_new: u64,
+    #[prost(uint64, tag="8")]
+    pub fee_protocol1_new: u64,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct EthUsdcPoolSwap {
+    #[prost(string, tag="1")]
+    pub evt_tx_hash: ::prost::alloc::string::String,
     #[prost(uint32, tag="2")]
     pub evt_index: u32,
     #[prost(message, optional, tag="3")]
