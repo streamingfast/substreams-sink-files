@@ -11,6 +11,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/streamingfast/cli"
 	. "github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/derr"
@@ -100,6 +101,15 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("new sinker: %w", err)
 	}
 
+	if blockRange := sinker.BlockRange(); blockRange.EndBlock() != nil {
+		size, err := sinker.BlockRange().Size()
+		if err != nil {
+			panic(fmt.Errorf("size should error only on open ended range, which we should have caught earlier: %w", err))
+		}
+
+		cli.Ensure(size >= blocksPerFile, "You requested %d blocks per file but your block range spans only %d blocks, this would produce 0 file, refusing to start", blocksPerFile, size)
+	}
+
 	fileOutputStore, err := dstore.NewStore(fileOutputPath, "", "", false)
 	if err != nil {
 		return fmt.Errorf("new store %q: %w", fileOutputPath, err)
@@ -131,8 +141,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("output module message descriptor: %w", err)
 		}
-
-		// tables := protox.ParquetFindTablesInMessageDescriptor(msgDesc)
 
 		parquetWriter, err := writer.NewParquetWriter(msgDesc)
 		if err != nil {
