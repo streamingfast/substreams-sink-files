@@ -32,6 +32,7 @@ import (
 func TestParquetWriter(t *testing.T) {
 	type parquetWriterCase struct {
 		name          string
+		skip          string
 		outputModules []proto.Message
 		expectedRows  map[string][]any
 	}
@@ -203,6 +204,7 @@ func TestParquetWriter(t *testing.T) {
 			},
 		},
 		{
+			skip: "ch-db is not able to map 'fixed_size_binary[32]' column erroring with 'not yet implemented populating from columns of type fixed_size_binary[32]'",
 			name: "from parquet tables, row with uint256 specialized column type",
 			outputModules: []proto.Message{
 				&pbtesting.RowColumnTypeUint256{
@@ -210,12 +212,13 @@ func TestParquetWriter(t *testing.T) {
 				},
 			},
 			expectedRows: map[string][]any{
-				"row_column_type": {
+				"row_column_type_uint_256": {
 					&GoRowColumnTypeUint256{Amount: uint256("999925881158281189828")},
 				},
 			},
 		},
 		{
+			skip: "ch-db is not able to map 'fixed_size_binary[32]' column erroring with 'not yet implemented populating from columns of type fixed_size_binary[32]'",
 			name: "from parquet tables, row with int256 specialized column type",
 			outputModules: []proto.Message{
 				&pbtesting.RowColumnTypeInt256{
@@ -224,7 +227,7 @@ func TestParquetWriter(t *testing.T) {
 				},
 			},
 			expectedRows: map[string][]any{
-				"row_column_type": {
+				"row_column_type_int_256": {
 					&GoRowColumnTypeInt256{
 						Positive: int256("999925881158281189828"),
 						Negative: int256("999925881158281189828"),
@@ -236,6 +239,10 @@ func TestParquetWriter(t *testing.T) {
 
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
+			if testCase.skip != "" {
+				t.Skip(testCase.skip)
+			}
+
 			storeDest := t.TempDir()
 
 			// Note that setting PARQUET_WRITER_TEST_DESTINATION stops performing the assertion

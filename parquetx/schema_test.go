@@ -18,9 +18,9 @@ func TestSchemaFromMessageDescriptor(t *testing.T) {
 	}{
 		{
 			"custom column type",
-			(&pbtesting.RowColumnType{}).ProtoReflect().Descriptor(),
+			(&pbtesting.RowColumnTypeUint256{}).ProtoReflect().Descriptor(),
 			schemaLiteral(`
-				message RowColumnType {
+				message RowColumnTypeUint256 {
 				  required fixed_len_byte_array(32) amount;
 				}
 			`),
