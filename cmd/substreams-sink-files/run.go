@@ -132,8 +132,6 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("output module message descriptor: %w", err)
 		}
 
-		// tables := protox.ParquetFindTablesInMessageDescriptor(msgDesc)
-
 		parquetWriter, err := writer.NewParquetWriter(msgDesc)
 		if err != nil {
 			return fmt.Errorf("new parquet writer: %w", err)

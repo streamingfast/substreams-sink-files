@@ -40,6 +40,7 @@ require (
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
+	github.com/holiman/uint256 v1.3.1 // indirect
 	github.com/huandu/go-sqlbuilder v1.27.3 // indirect
 	github.com/huandu/xstrings v1.4.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect

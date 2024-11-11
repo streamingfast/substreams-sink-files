@@ -121,7 +121,7 @@ func WalkMessageDescriptors(root protoreflect.MessageDescriptor, onChild func(on
 			if tracer.Enabled() {
 				zlog.Debug("message field descriptor",
 					zap.String("field", string(field.FullName())),
-					zap.String("kind", field.Kind().String()),
+					zap.Stringer("kind", field.Kind()),
 					zap.Bool("is_list", field.IsList()),
 				)
 			}

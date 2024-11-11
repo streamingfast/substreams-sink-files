@@ -25,9 +25,9 @@ message EthUsdcPool_Burn {
     bytes owner = 5;
     int64 tick_lower = 6;
     int64 tick_upper = 7;
-    string amount = 8;
-    string amount0 = 9;
-    string amount1 = 10;
+    string amount = 8 [(parquet.column_type) = UINT256];
+    string amount0 = 9 [(parquet.column_type) = INT256];
+    string amount1 = 10 [(parquet.column_type) = INT256];
 }
 message EthUsdcPool_Collect {
     string evt_tx_hash = 1;
@@ -38,8 +38,8 @@ message EthUsdcPool_Collect {
     bytes recipient = 6;
     int64 tick_lower = 7;
     int64 tick_upper = 8;
-    string amount0 = 9;
-    string amount1 = 10;
+    string amount0 = 9 [(parquet.column_type) = INT256];
+    string amount1 = 10 [(parquet.column_type) = INT256];
 }
 message EthUsdcPool_CollectProtocol {
     string evt_tx_hash = 1;
@@ -48,8 +48,8 @@ message EthUsdcPool_CollectProtocol {
     uint64 evt_block_number = 4;
     bytes sender = 5;
     bytes recipient = 6;
-    string amount0 = 7;
-    string amount1 = 8;
+    string amount0 = 7 [(parquet.column_type) = INT256];
+    string amount1 = 8 [(parquet.column_type) = INT256];
 }
 message EthUsdcPool_Flash {
     option (parquet.table_name) = "flashes";
@@ -60,10 +60,10 @@ message EthUsdcPool_Flash {
     uint64 evt_block_number = 4;
     bytes sender = 5;
     bytes recipient = 6;
-    string amount0 = 7;
-    string amount1 = 8;
-    string paid0 = 9;
-    string paid1 = 10;
+    string amount0 = 7 [(parquet.column_type) = INT256];
+    string amount1 = 8 [(parquet.column_type) = INT256];
+    string paid0 = 9 [(parquet.column_type) = INT256];
+    string paid1 = 10 [(parquet.column_type) = INT256];
 }
 message EthUsdcPool_IncreaseObservationCardinalityNext {
     string evt_tx_hash = 1;
@@ -78,7 +78,7 @@ message EthUsdcPool_Initialize {
     uint32 evt_index = 2;
     google.protobuf.Timestamp evt_block_time = 3;
     uint64 evt_block_number = 4;
-    string sqrt_price_x96 = 5;
+    string sqrt_price_x96 = 5 [(parquet.column_type) = UINT256];
     int64 tick = 6;
 }
 message EthUsdcPool_Mint {
@@ -92,9 +92,9 @@ message EthUsdcPool_Mint {
     bytes owner = 6;
     int64 tick_lower = 7;
     int64 tick_upper = 8;
-    string amount = 9;
-    string amount0 = 10;
-    string amount1 = 11;
+    string amount = 9 [(parquet.column_type) = UINT256];
+    string amount0 = 10 [(parquet.column_type) = INT256];
+    string amount1 = 11 [(parquet.column_type) = INT256];
 }
 message EthUsdcPool_SetFeeProtocol {
     string evt_tx_hash = 1;
@@ -115,9 +115,9 @@ message EthUsdcPool_Swap {
     uint64 evt_block_number = 4;
     bytes sender = 5;
     bytes recipient = 6;
-    string amount0 = 7;
-    string amount1 = 8;
-    string sqrt_price_x96 = 9;
-    string liquidity = 10;
+    string amount0 = 7 [(parquet.column_type) = INT256];
+    string amount1 = 8 [(parquet.column_type) = INT256];
+    string sqrt_price_x96 = 9 [(parquet.column_type) = UINT256];
+    string liquidity = 10 [(parquet.column_type) = UINT256];
     int64 tick = 11;
 }

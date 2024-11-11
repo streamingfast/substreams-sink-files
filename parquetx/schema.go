@@ -60,10 +60,10 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor) (o
 	}
 
 	// Otherwise, let's support the case to pickup each repeated fields as a table
-	repeatedFieldCount := protox.MessageRepeatedFieldCount(descriptor)
+	messageRepeatedFields := protox.FindMessageRepeatedFields(descriptor)
 
 	// There is no repeated fields, assume we have a 1:1 mapping between a block and a row, use the message as-is
-	if repeatedFieldCount == 0 {
+	if len(messageRepeatedFields) == 0 {
 		tableName := strcase.ToSnake(string(descriptor.Name()))
 
 		return []TableResult{
@@ -124,6 +124,19 @@ func IsFieldIgnored(field protoreflect.FieldDescriptor) bool {
 	return proto.GetExtension(options, parquetpb.E_Ignored).(bool)
 }
 
+func GetFieldColumnType(field protoreflect.FieldDescriptor) (parquetpb.ColumnType, bool) {
+	options, hasOptions := field.Options().(*descriptorpb.FieldOptions)
+	if !hasOptions || options == nil {
+		return parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE, false
+	}
+
+	if !proto.HasExtension(options, parquetpb.E_ColumnType) {
+		return parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE, false
+	}
+
+	return proto.GetExtension(options, parquetpb.E_ColumnType).(parquetpb.ColumnType), proto.HasExtension(options, parquetpb.E_ColumnType)
+}
+
 var _ parquet.Node = (*messageNode)(nil)
 
 type messageNode struct {
@@ -136,14 +149,8 @@ func newMessageNode(descriptor protoreflect.MessageDescriptor) *messageNode {
 	parquetFields := make([]parquet.Field, 0, fields.Len())
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
-		field.Options()
-
-		options, hasOptions := field.Options().(*descriptorpb.FieldOptions)
-		if hasOptions && options != nil {
-			isIgnored := proto.HasExtension(options, parquetpb.E_Ignored) && proto.GetExtension(options, parquetpb.E_Ignored).(bool)
-			if isIgnored {
-				continue
-			}
+		if IsFieldIgnored(field) {
+			continue
 		}
 
 		parquetFields = append(parquetFields, toParquetField(field))
@@ -157,12 +164,16 @@ func newMessageNode(descriptor protoreflect.MessageDescriptor) *messageNode {
 
 func toParquetField(field protoreflect.FieldDescriptor) parquet.Field {
 	return &messageField{
-		Node:      protoreflectKindToParquetNode(field),
+		Node:      protoFieldToParquetNode(field),
 		fieldName: string(field.Name()),
 	}
 }
 
-func protoreflectKindToParquetNode(field protoreflect.FieldDescriptor) parquet.Node {
+func protoFieldToParquetNode(field protoreflect.FieldDescriptor) parquet.Node {
+	if columnType, hasColumnType := GetFieldColumnType(field); hasColumnType && columnType != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
+		return columnTypeOptionToParquetNode(columnType)
+	}
+
 	switch field.Kind() {
 	case protoreflect.StringKind:
 		return parquet.String()
@@ -196,6 +207,19 @@ func protoreflectKindToParquetNode(field protoreflect.FieldDescriptor) parquet.N
 
 	default:
 		panic(fmt.Errorf("field %s is of kind %s which is not supported yet", field.FullName(), field.Kind()))
+	}
+}
+
+func columnTypeOptionToParquetNode(columnType parquetpb.ColumnType) parquet.Node {
+	switch columnType {
+	case parquetpb.ColumnType_INT256:
+		return parquet.Leaf(parquet.FixedLenByteArrayType(32))
+
+	case parquetpb.ColumnType_UINT256:
+		return parquet.Leaf(parquet.FixedLenByteArrayType(32))
+
+	default:
+		panic(fmt.Errorf("column type %s is not supported yet", columnType))
 	}
 }
 

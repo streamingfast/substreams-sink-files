@@ -1,9 +1,14 @@
 package parquetx
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math/big"
+	"strings"
 
+	"github.com/holiman/uint256"
 	"github.com/parquet-go/parquet-go"
+	parquetpb "github.com/streamingfast/substreams-sink-files/pb/parquet"
 	"github.com/streamingfast/substreams-sink-files/protox"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -23,6 +28,14 @@ func (f protoRowExtractorFunc) ExtractRows(root protoreflect.Message) (map[strin
 }
 
 func ProtoRowExtractorFromTables(tables []TableResult) ProtoRowExtractor {
+	// FIXME: This is relatively inefficient as we are traversing some message fields that
+	// are dead end and will not yield any rows. We need to change that by first walking
+	// the message and building a list of every "paths" to field (deeply nested too + list
+	// handling) that will collect all paths that must be followed to extract rows.
+	//
+	// Once we have that, we can stop naively walking the message and instead only follows
+	// paths with the Message value that will yield rows.
+
 	tablesByMessage := make(map[protoreflect.FullName]*parquet.Schema, len(tables))
 	for _, table := range tables {
 		tablesByMessage[table.Descriptor.FullName()] = table.Schema
@@ -96,8 +109,6 @@ func ProtoRowExtractorFromTables(tables []TableResult) ProtoRowExtractor {
 				if field.IsList() {
 					list := node.Get(field).List()
 					for i := 0; i < list.Len(); i++ {
-						// FIXME: Is it possible to have `repeated repeated X`, I think Protobuf does not allow that
-
 						// Recurse into the message if message was not found in the tables in is not a list
 						if err := processNode(list.Get(i).Message()); err != nil {
 							// Propagate the error up
@@ -182,6 +193,16 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 
 		value := message.Get(field)
 
+		if columnType, found := GetFieldColumnType(field); found && columnType != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
+			column, err := protoValueToColumnTypeValue(columnType, field, value)
+			if err != nil {
+				return nil, fmt.Errorf("converting field %q to column value: %w", field.FullName(), err)
+			}
+
+			columns = append(columns, column)
+			continue
+		}
+
 		switch field.Kind() {
 		case protoreflect.BoolKind:
 			columns = append(columns, parquet.BooleanValue(value.Bool()))
@@ -216,4 +237,77 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 	}
 
 	return parquet.Row(columns), nil
+}
+
+func protoValueToColumnTypeValue(columnType parquetpb.ColumnType, field protoreflect.FieldDescriptor, value protoreflect.Value) (out parquet.Value, err error) {
+	switch columnType {
+	case parquetpb.ColumnType_INT256:
+		return columnTypeInt256ToParquetValue(field, value)
+
+	case parquetpb.ColumnType_UINT256:
+		return columnTypeUint256ToParquetValue(field, value)
+
+	default:
+		return out, fmt.Errorf("unsupported column type %s", columnType)
+	}
+}
+
+func columnTypeInt256ToParquetValue(field protoreflect.FieldDescriptor, value protoreflect.Value) (out parquet.Value, err error) {
+	switch field.Kind() {
+	case protoreflect.StringKind:
+		stringValue := value.String()
+
+		number, ok := new(big.Int).SetString(stringValue, 0)
+		if !ok {
+			return out, fmt.Errorf("converting string %q to big.Int", stringValue)
+		}
+
+		if number.BitLen() > 256 {
+			return out, fmt.Errorf("converting string %q to big.Int: number is too large", stringValue)
+		}
+
+		// FIXME: Deal with negative numbers vs positive numbers correctly!
+		data := make([]byte, 32)
+		number.FillBytes(data)
+
+		// We **must** use a []byte of exactly 32 bytes, otherwise the parquet writer skip the row.
+		return parquet.FixedLenByteArrayValue(data), nil
+
+	default:
+		return out, fmt.Errorf("unsupported conversion from field kind %s to column value of type %s", field.Kind(), parquetpb.ColumnType_UINT256)
+	}
+}
+
+func columnTypeUint256ToParquetValue(field protoreflect.FieldDescriptor, value protoreflect.Value) (out parquet.Value, err error) {
+	switch field.Kind() {
+	case protoreflect.StringKind:
+		stringValue := value.String()
+
+		var number *uint256.Int
+		if strings.HasPrefix(stringValue, "0x") {
+			number, err = uint256.FromHex(stringValue)
+			if err != nil {
+				return out, fmt.Errorf("converting hex string %q to uint256: %w", stringValue, err)
+			}
+		} else {
+			number, err = uint256.FromDecimal(stringValue)
+			if err != nil {
+				return out, fmt.Errorf("converting decimal string %q to uint256: %w", stringValue, err)
+			}
+		}
+
+		// Seems we need to be in little endian, number.Bytes32() doesn't work, is it a problem with Parquet writer?
+		data := make([]byte, 32)
+		binary.LittleEndian.PutUint64(data[0:8], number[0])
+		binary.LittleEndian.PutUint64(data[8:16], number[1])
+		binary.LittleEndian.PutUint64(data[16:24], number[2])
+		binary.LittleEndian.PutUint64(data[24:32], number[3])
+
+		// We **must** use a []byte of exactly 32 bytes, otherwise the parquet writer skip the row.
+		// See https://github.com/parquet-go/parquet-go/issues/178
+		return parquet.FixedLenByteArrayValue(data), nil
+
+	default:
+		return out, fmt.Errorf("unsupported conversion from field kind %s to column value of type %s", field.Kind(), parquetpb.ColumnType_UINT256)
+	}
 }

@@ -1,0 +1,1 @@
+describe table file('$PARQUET_TABLE/$TABLE/*', Parquet);

@@ -14,11 +14,18 @@ extend google.protobuf.MessageOptions {
 
 extend google.protobuf.FieldOptions {
   bool ignored = 548935;
-  TimestampType timestamp_type = 548933;
+  ColumnType column_type = 548936;
+  TimestampType timestamp_type = 548937;
+}
+
+enum ColumnType {
+  UNSPECIFIED_COLUMN_TYPE = 0;
+  UINT256 = 1;
+  INT256 = 2;
 }
 
 enum TimestampType {
-  UNSPECIFIED = 0;
+  UNSPECIFIED_TIMESTAMP_TYPE = 0;
   TIMESTAMP_MILLIS = 1;
   TIMESTAMP_MICROS = 2;
   TIMESTAMP_NANOS = 3;

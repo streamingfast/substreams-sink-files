@@ -210,9 +210,13 @@ func (p *ParquetWriter) EncodeMapModule(output *pbsubstreamsrpc.MapModuleOutput)
 			panic(fmt.Errorf("rows buffer must be initialized on StartBoundary, code is wrong"))
 		}
 
-		_, err = rowsBuffer.WriteRows(rows)
+		n, err := rowsBuffer.WriteRows(rows)
 		if err != nil {
 			return fmt.Errorf("writing rows to buffer: %w", err)
+		}
+
+		if n != len(rows) {
+			return fmt.Errorf("expected to write %d rows, but wrote %d", len(rows), n)
 		}
 	}
 
