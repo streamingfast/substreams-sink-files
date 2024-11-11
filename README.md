@@ -1,64 +1,62 @@
-# Substreams sink files
+# Substreams Sink Files
 
-## Description
+`substreams-sink-files` is a tool that allows developers to pipe data extracted from a blockchain into various file base format like CSV, JSONL & Parquet.
 
-`substreams-sink-files` is a tool that allows developers to pipe data extracted from a blockchain into various types of local or Cloud files-based persistence solutions.
+## Usage
 
-## Prerequisites
+Install `substreams-sink-files` by using the pre-built binary release [available in the official GitHub repository](https://github.com/streamingfast/substreams-sink-files/releases) or install using brew by doing `brew install streamingfast/tap/substreams-sink-files`.
 
-- A Substreams module prepared for a files-sink
-- Cloud-based file storage mechanism (optional)
 
-## Installation
+The sink supports different Substreams output module's type, here a jump list of today's supported formats:
 
-Install `substreams-sink-files` by using the pre-built binary release [available in the official GitHub repository](https://github.com/streamingfast/substreams-sink-files/releases).
+- [Line-based CSV](#jsonl-csv-and-any-other-line-based-format)
+- [Line-based JSONL](#jsonl-csv-and-any-other-line-based-format)
+- [Arbitrary Protobuf to JSON]
+- Parquet
 
-Extract `substreams-sink-files` into a folder and ensure this folder is referenced globally via your `PATH` environment variable.
+### JSONL, CSV and any other line based format
 
-## Using the `substreams-sink-files` tool
+The sink supports an output type [sf.substreams.sink.files.v1.Lines](./proto/sf/substreams/sink/files/v1/files.proto) that can handle any line format, the Substreams being responsible of transforming blocks into lines of the format of your choice. The [sf.substreams.sink.files.v1.Lines](./proto/sf/substreams/sink/files/v1/files.proto) [documentation found on this link](https://github.com/streamingfast/substreams-sink-files/blob/feature/parquet/proto/sf/substreams/sink/files/v1/files.proto#L13-L26) gives further details about the format.
 
-The `run` command is the primary way to work with the `substreams-sink-files` tool. The command for your project will resemble the following:
+The [Substreams Ethereum Token Transfers example](https://github.com/streamingfast/substreams-eth-token-transfers/blob/develop/src/lib.rs#L31-L46) can be used as an example, it showcases both JSONL and CSV output format:
+
+> [!NOTE]
+> Change output module `jsonl_out` below to `csv_out` to test CSV output
 
 ```bash
-substreams-sink-files run \
-    mainnet.eth.streamingfast.io:443 \
+substreams-sink-files run mainnet.eth.streamingfast.io:443 \
     https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg \
     jsonl_out \
     ./localdata/out \
+    10_000_000:+100_000 \
     --encoder=lines \
-    --file-working-dir="./localdata/working" \
-    --state-store=./localdata/working/state.yaml \
-    10_000_000:+100_000
+    --file-block-count=10000
 ```
 
-> **Note** We use a custom range here `10_000_000:+100_000` because there is no ERC20/ERC721/ERC1155 until a long time in the chain.
-
-Output resembling the following will be printed to the terminal window for properly issued commands and a properly set up and configured Substreams module.
+This will run the Substreams, processes 100 000 blocks and at each bundle of 10 000 blocks, will produce a file containing the lines output by the module, resulting in the files on disk:
 
 ```bash
-2023-06-16T11:23:52.342-0400 INFO (substreams-sink-files) starting prometheus metrics server {"listen_addr": "localhost:9102"}
-2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) sink to files {"file_output_path": "./localdata/out", "file_working_dir": "./localdata/working", "encoder_type": "lines", "state_store": "./localdata/working/state.yaml", "blocks_per_file": 10000, "buffer_max_size": 67108864}
-2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) sinker from CLI {"endpoint": "mainnet.eth.streamingfast.io:443", "manifest_path": "https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg", "output_module_name": "jsonl_out", "expected_module_type": "<Ignored>", "block_range": "10_000_000:+100_000"}
-2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) reading substreams manifest {"manifest_path": "https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg"}
-2023-06-16T11:23:52.343-0400 INFO (substreams-sink-files) starting pprof server {"listen_addr": "localhost:6060"}
-2023-06-16T11:23:52.660-0400 INFO (substreams-sink-files) validating output module {"module_name": "jsonl_out"}
-2023-06-16T11:23:52.660-0400 INFO (substreams-sink-files) validating output module type {"module_name": "jsonl_out", "module_type": "proto:substreams.sink.files.v1.Lines"}
-2023-06-16T11:23:52.663-0400 INFO (substreams-sink-files) sinker configured {"mode": "Production", "module_count": 3, "output_module_name": "jsonl_out", "output_module_type": "proto:substreams.sink.files.v1.Lines", "output_module_hash": "0d94c2c7662fbe04923c43d9f8732e0858f7af37", "client_config": "mainnet.eth.streamingfast.io:443 (insecure: false, plaintext: false, JWT present: true)", "buffer": true, "block_range": "[10000000, 10100000)", "infinite_retry": false, "final_blocks_only": false, "liveness_checker": true}
-2023-06-16T11:23:52.666-0400 INFO (substreams-sink-files) ready, waiting for signal to quit
-2023-06-16T11:23:52.667-0400 INFO (substreams-sink-files) starting new file boundary {"boundary": "[10000000, 10010000)"}
-2023-06-16T11:23:52.684-0400 INFO (substreams-sink-files) boundary started {"boundary": "[10000000, 10010000)"}
-2023-06-16T11:23:52.684-0400 INFO (substreams-sink-files) starting file sink {"restarting_at": "#10009999 (601b697795b7435dcb3f661aeea877fae4e3b534044a5940497b0a04a8845621)"}
-2023-06-16T11:23:52.684-0400 INFO (substreams-sink-files) starting sinker {"stats_refresh_each": "15s", "restarting_at": "#10009999 (601b697795b7435dcb3f661aeea877fae4e3b534044a5940497b0a04a8845621)", "end_at": "#1374390772024"}
-2023-06-16T11:23:52.801-0400 INFO (substreams-sink-files) session initialized with remote endpoint {"trace_id": "8fd18de5b6acb648867f4b2828bee602"}
-2023-06-16T11:23:53.054-0400 INFO (substreams-sink-files) block_num is not in active boundary {"active_boundary": "[10000000, 10010000)", "boundaries_to_skip": 0, "block_num": 10010000}
-2023-06-16T11:23:53.054-0400 INFO (substreams-sink-files) stopping file boundary
-2023-06-16T11:23:53.054-0400 INFO (substreams-sink-files) all data from range is in memory, no need to flush
-2023-06-16T11:23:53.055-0400 INFO (substreams-sink-files) queuing boundary upload {"boundary": "[10000000, 10010000)"}
-2023-06-16T11:23:53.056-0400 INFO (substreams-sink-files) bundler stats {"file_count": 1, "boundary": "[10000000, 10010000)", "boundary_process_duration": "371.596208ms", "upload_duration": "0s", "data_process_duration": "0s", "avg_upload_dur": 0, "total_upload_dur": 0, "avg_boundary_process_dur": 0.371596208, "total_boundary_process_dur": 0.371596208, "avg_data_process_dur": 0, "total_data_process_dur": 0}
-2023-06-16T11:23:53.056-0400 INFO (substreams-sink-files) starting new file boundary {"boundary": "[10010000, 10020000)"}
-2023-06-16T11:23:53.058-0400 INFO (substreams-sink-files) boundary uploaded {"boundary": "[10000000, 10010000)", "output_path": "localdata/out/0010000000-0010010000.jsonl"}
-2023-06-16T11:23:53.060-0400 INFO (substreams-sink-files) boundary started {"boundary": "[10010000, 10020000)"}
+./localdata/out
+├── 0010000000-0010010000.jsonl
+├── 0010010000-0010020000.jsonl
+├── 0010020000-0010030000.jsonl
+├── 0010030000-0010040000.jsonl
+├── 0010040000-0010050000.jsonl
+├── 0010050000-0010060000.jsonl
+├── 0010060000-0010070000.jsonl
+├── 0010070000-0010080000.jsonl
+├── 0010080000-0010090000.jsonl
+└── 0010090000-0010100000.jsonl
 ```
+
+With example of file content:
+
+```json
+$ cat localdata/out/0010000000-0010010000.jsonl| head -n1
+{"schema":"erc20","trx_hash":"1f17943d5dd7053959f1dc092dfad60a7caa084224212b1adbecaf3137efdfdd","log_index":0,"from":"876eabf441b2ee5b5b0554fd502a8e0600950cfa","to":"566021352eb2f882538bf8d59e5d2ba741b9ec7a","quantity":"95073600000000000000","operator":"","token_id":""}
+```
+
+## Documentation
 
 ### Cursors
 
