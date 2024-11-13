@@ -104,12 +104,16 @@ message RowT {
 }
 
 message RowColumnTypeUint256 {
-    string amount = 1 [(parquet.column_type) = UINT256];
+    string amount = 1 [(parquet.column) = {type: UINT256}];
 }
 
 message RowColumnTypeInt256 {
-    string positive = 1 [(parquet.column_type) = INT256];
-    string negative = 2 [(parquet.column_type) = INT256];
+    string positive = 1 [(parquet.column) = {type: INT256}];
+    string negative = 2 [(parquet.column) = {type: INT256}];
+}
+
+message RowColumnCompressionZstd {
+    string value = 1 [(parquet.column) = {compression: ZSTD}];
 }
 
 message IgnoredRow {

@@ -7,9 +7,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/streamingfast/cli"
 	. "github.com/streamingfast/cli"
 	sink "github.com/streamingfast/substreams-sink"
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/parquetx"
 )
 
@@ -17,6 +19,9 @@ var ToolsParquet = Group("parquet", "Parquet related tools",
 	Command(toolsParquetSchemaE,
 		"schema <manifest> [<output_module>]",
 		"Generate a parquet schema from a proto message",
+		Flags(func(flags *pflag.FlagSet) {
+			addCommonParquetFlags(flags)
+		}),
 		RangeArgs(1, 2),
 	),
 )
@@ -44,7 +49,10 @@ func toolsParquetSchemaE(cmd *cobra.Command, args []string) error {
 	descriptor, err := outputProtoreflectMessageDescriptor(sinker)
 	cli.NoError(err, "Failed to extract message descriptor from output module")
 
-	tables, _ := parquetx.FindTablesInMessageDescriptor(descriptor)
+	parquetWriterOptions, err := writer.NewParquetWriterOptions(readCommonParquetFlags(cmd).AsParquetWriterOptions())
+	cli.NoError(err, "Failed to create parquet writer options")
+
+	tables, _ := parquetx.FindTablesInMessageDescriptor(descriptor, parquetWriterOptions.DefaultColumnCompression)
 	if len(tables) == 0 {
 		fmt.Printf("No tables found or inferred in message descriptor %q\n", descriptor.FullName())
 		os.Exit(1)

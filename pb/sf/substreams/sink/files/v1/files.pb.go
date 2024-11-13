@@ -28,7 +28,7 @@ const (
 )
 
 // Lines represents an ordered list of lines that have been extracted of a single block. You are
-// free the format each line as you please, the `substream-sink-files` tool does not make any
+// free to format each line as you please, the `substream-sink-files` tool does not make any
 // assumption about the content and simply write the content to the current bundle with a trailing
 // new line.
 //

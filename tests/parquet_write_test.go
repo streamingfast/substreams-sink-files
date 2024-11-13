@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -29,22 +28,24 @@ import (
 	_ "github.com/chdb-io/chdb-go/chdb/driver"
 )
 
-func TestParquetWriter(t *testing.T) {
-	type parquetWriterCase struct {
-		name          string
-		skip          string
-		outputModules []proto.Message
-		expectedRows  map[string][]any
-	}
+type parquetWriterCase[T any] struct {
+	name          string
+	skip          string
+	onlyDrivers   []string
+	writerOptions []writer.ParquetWriterOption
+	outputModules []proto.Message
+	expectedRows  map[string][]T
+}
 
-	cases := []parquetWriterCase{
+func TestParquetWriter(t *testing.T) {
+	runCases(t, []parquetWriterCase[GoRow]{
 		{
 			name: "message is a single row, one block equals one row",
 			outputModules: []proto.Message{
 				testProtobufRow(0),
 				testProtobufRow(1),
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"row": {
 					testGoRow(0),
 					testGoRow(1),
@@ -65,7 +66,7 @@ func TestParquetWriter(t *testing.T) {
 					},
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"elements": {
 					testGoRow(0),
 					testGoRow(1),
@@ -90,7 +91,7 @@ func TestParquetWriter(t *testing.T) {
 					},
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"table_a": {
 					testGoRow(1),
 					testGoRow(2),
@@ -115,7 +116,7 @@ func TestParquetWriter(t *testing.T) {
 					Row: testProtobufRowT(3),
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"rows": {
 					testGoRow(0),
 					testGoRow(3),
@@ -139,7 +140,7 @@ func TestParquetWriter(t *testing.T) {
 					},
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"rows": {
 					testGoRow(0),
 					testGoRow(1),
@@ -158,7 +159,7 @@ func TestParquetWriter(t *testing.T) {
 					},
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"rows": {
 					testGoRow(0),
 				},
@@ -176,7 +177,7 @@ func TestParquetWriter(t *testing.T) {
 					},
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"rows": {
 					testGoRow(0),
 					testGoRow(1),
@@ -196,7 +197,7 @@ func TestParquetWriter(t *testing.T) {
 					},
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRow{
 				"rows": {
 					testGoRow(0),
 					testGoRow(1),
@@ -204,19 +205,39 @@ func TestParquetWriter(t *testing.T) {
 			},
 		},
 		{
-			skip: "ch-db is not able to map 'fixed_size_binary[32]' column erroring with 'not yet implemented populating from columns of type fixed_size_binary[32]'",
+			name:          "default compression working",
+			writerOptions: []writer.ParquetWriterOption{writer.ParquetDefaultColumnCompression("snappy")},
+			outputModules: []proto.Message{
+				testProtobufRow(0),
+				testProtobufRow(1),
+			},
+			expectedRows: map[string][]GoRow{
+				"row": {
+					testGoRow(0),
+					testGoRow(1),
+				},
+			},
+		},
+	})
+
+	runCases(t, []parquetWriterCase[GoRowColumnTypeUint256]{
+		{
+			skip: "parquet-go panics, ch-db is not able to map 'fixed_size_binary[32]' column erroring with 'not yet implemented populating from columns of type fixed_size_binary[32]'",
 			name: "from parquet tables, row with uint256 specialized column type",
 			outputModules: []proto.Message{
 				&pbtesting.RowColumnTypeUint256{
 					Amount: "999925881158281189828",
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRowColumnTypeUint256{
 				"row_column_type_uint_256": {
-					&GoRowColumnTypeUint256{Amount: uint256("999925881158281189828")},
+					GoRowColumnTypeUint256{Amount: uint256("999925881158281189828")},
 				},
 			},
 		},
+	})
+
+	runCases(t, []parquetWriterCase[GoRowColumnTypeInt256]{
 		{
 			skip: "ch-db is not able to map 'fixed_size_binary[32]' column erroring with 'not yet implemented populating from columns of type fixed_size_binary[32]'",
 			name: "from parquet tables, row with int256 specialized column type",
@@ -226,17 +247,35 @@ func TestParquetWriter(t *testing.T) {
 					Negative: "999925881158281189828",
 				},
 			},
-			expectedRows: map[string][]any{
+			expectedRows: map[string][]GoRowColumnTypeInt256{
 				"row_column_type_int_256": {
-					&GoRowColumnTypeInt256{
+					GoRowColumnTypeInt256{
 						Positive: int256("999925881158281189828"),
 						Negative: int256("999925881158281189828"),
 					},
 				},
 			},
 		},
-	}
+	})
 
+	runCases(t, []parquetWriterCase[GoRowColumnCompressionZstd]{
+		{
+			name: "parquet column compression zstd",
+			outputModules: []proto.Message{
+				&pbtesting.RowColumnCompressionZstd{
+					Value: "abc-0",
+				},
+			},
+			expectedRows: map[string][]GoRowColumnCompressionZstd{
+				"row_column_compression_zstd": {
+					GoRowColumnCompressionZstd{Value: "abc-0"},
+				},
+			},
+		},
+	})
+}
+
+func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			if testCase.skip != "" {
@@ -259,7 +298,7 @@ func TestParquetWriter(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			writer, err := writer.NewParquetWriter(descriptor)
+			writer, err := writer.NewParquetWriter(descriptor, testCase.writerOptions...)
 			require.NoError(t, err)
 
 			err = writer.StartBoundary(bstream.NewRangeExcludingEnd(0, 1000))
@@ -290,45 +329,39 @@ func TestParquetWriter(t *testing.T) {
 				return
 			}
 
-			for tableName, expectedRows := range testCase.expectedRows {
-				storeFilename := tableName + "/" + "0000000000-0000001000.parquet"
+			drivers := []string{"parquet-go", "chdb"}
+			if len(testCase.onlyDrivers) > 0 {
+				drivers = testCase.onlyDrivers
+			}
 
-				exists, err := store.FileExists(ctx, storeFilename)
-				require.NoError(t, err)
-				require.True(t, exists, "filename %q does not exist, files available: %s", storeFilename, strings.Join(listFiles(t, store), ", "))
+			for _, driver := range drivers {
+				t.Run(testCase.name+" ("+driver+")", func(t *testing.T) {
+					for tableName, expectedRows := range testCase.expectedRows {
+						storeFilename := tableName + "/" + "0000000000-0000001000.parquet"
 
-				chFileInput := filepath.Join(storeDest, tableName, "*.parquet")
+						exists, err := store.FileExists(ctx, storeFilename)
+						require.NoError(t, err)
+						require.True(t, exists, "filename %q does not exist, files available: %s", storeFilename, strings.Join(listFiles(t, store), ", "))
 
-				dbx, err := sqlx.Open("chdb", "")
-				require.NoError(t, err)
+						if driver == "parquet-go" {
+							actualRows, err := parquet.ReadFile[T](store.ObjectPath(storeFilename), parquet.NewSchema(tableName, parquet.Group{}))
+							require.NoError(t, err, "driver %q", driver)
 
-				// We need to retrieve the value's underlying type to create a slice of concrete type (and not interface{}!)
-				// So we find the first row concrete value and extract it's type which will be interface{} then on this
-				// reflect.Type we call .Elem() to get the concrete value type of the array.
-				require.True(t, len(expectedRows) > 0, "Tests resulting in no rows are not supported yet")
-				rowsValue := reflect.ValueOf(expectedRows)
-				rowConcreteType := rowsValue.Index(0).Elem().Type()
-				rowsConcreteType := reflect.SliceOf(rowConcreteType)
+							assert.Equal(t, expectedRows, actualRows, "driver %q", driver)
+						} else if driver == "chdb" {
+							chFileInput := filepath.Join(storeDest, tableName, "*.parquet")
 
-				rowsPtr := reflect.New(rowsConcreteType)
-				rowsPtr.Elem().Set(reflect.MakeSlice(rowsConcreteType, 0, 8))
+							dbx, err := sqlx.Open("chdb", "")
+							require.NoError(t, err, "driver %q", driver)
 
-				err = dbx.Select(rowsPtr.Interface(), fmt.Sprintf(`select * from file('%s', Parquet)`, chFileInput))
-				require.NoError(t, err)
+							var destinationRows []T
+							err = dbx.Select(&destinationRows, fmt.Sprintf(`select * from file('%s', Parquet)`, chFileInput))
+							require.NoError(t, err, "driver %q", driver)
 
-				actualRows := reflect.Indirect(rowsPtr)
-				for i := 0; i < actualRows.Len(); i++ {
-					if v, ok := actualRows.Index(i).Addr().Interface().(timestampFixable); ok {
-						v.fixTimestamps()
+							assert.Equal(t, testCase.expectedRows[tableName], destinationRows, "driver %q", driver)
+						}
 					}
-				}
-
-				concreteExpectedRows := reflect.MakeSlice(rowsConcreteType, 0, len(expectedRows))
-				for _, expectedRow := range expectedRows {
-					concreteExpectedRows = reflect.Append(concreteExpectedRows, reflect.ValueOf(expectedRow))
-				}
-
-				assert.Equal(t, concreteExpectedRows.Interface(), actualRows.Interface())
+				})
 			}
 		})
 	}
@@ -433,10 +466,6 @@ func testGoRow(i int) GoRow {
 	}
 }
 
-type timestampFixable interface {
-	fixTimestamps()
-}
-
 type GoRow struct {
 	TypeString    string    `parquet:"typeString" db:"typeString"`
 	TypeInt32     int32     `parquet:"typeInt32" db:"typeInt32"`
@@ -456,13 +485,9 @@ type GoRow struct {
 	TypeTimestamp time.Time `parquet:"typeTimestamp" db:"typeTimestamp"`
 }
 
-func (r *GoRow) fixTimestamps() {
-	r.TypeTimestamp = r.TypeTimestamp.UTC()
-}
-
 type GoRowColumnTypeInt256 struct {
 	Positive *Int256 `parquet:"positive" db:"positive"`
-	Negative *Int256 `parquet:"negative" db:"amount"`
+	Negative *Int256 `parquet:"negative" db:"negative"`
 }
 
 type Int256 big.Int
@@ -537,4 +562,8 @@ func (b *Uint256) Scan(value interface{}) error {
 	default:
 		return fmt.Errorf("unsupported type %T", value)
 	}
+}
+
+type GoRowColumnCompressionZstd struct {
+	Value string `parquet:"value" db:"value"`
 }

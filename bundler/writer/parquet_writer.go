@@ -23,18 +23,8 @@ var _ Writer = (*ParquetWriter)(nil)
 
 // ParquetWriter implements our internal interface for writing Parquet data to files
 // directly.
-//
-// FIXME: There is definitely a lot of knowledge to share between [ParquetWriter] here
-// and [encoder.ProtoToParquet] struct. Indeed, both needs to determine some kind of information
-// about the message structure to be able to work properly. The write for example needs to find the
-// correct Message to derive a "table" schema from. The [encoder.ProtoToParquet] needs similar information
-// but this time to extract "rows" to pass to the [ParquetWriter] here.
-//
-// In fact more I think about, Writer and Encoder should co-exists to decouple I/O to actual line format
-// used (CSV, JSONL, TSV, etc). But in the case of Parquet, there is no sense to actually have the relationship
-// as the writer and the encoder a coupled and can go only hand-in-hand (e.g. there will never be a [ParquetWriter]
-// with a different encoder implementation).
 type ParquetWriter struct {
+	options      *ParquetWriterOptions
 	descriptor   protoreflect.MessageDescriptor
 	tables       []parquetx.TableResult
 	tablesByName map[string]parquetx.TableResult
@@ -44,8 +34,13 @@ type ParquetWriter struct {
 	rowsBufferByTableName map[string]*parquet.RowBuffer[any]
 }
 
-func NewParquetWriter(descriptor protoreflect.MessageDescriptor) (*ParquetWriter, error) {
-	tables, rowExtractor := parquetx.FindTablesInMessageDescriptor(descriptor)
+func NewParquetWriter(descriptor protoreflect.MessageDescriptor, opts ...ParquetWriterOption) (*ParquetWriter, error) {
+	options, err := NewParquetWriterOptions(opts)
+	if err != nil {
+		return nil, fmt.Errorf("invalid parquet writer options: %w", err)
+	}
+
+	tables, rowExtractor := parquetx.FindTablesInMessageDescriptor(descriptor, options.DefaultColumnCompression)
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("no tables found in message descriptor")
 	}
@@ -56,6 +51,7 @@ func NewParquetWriter(descriptor protoreflect.MessageDescriptor) (*ParquetWriter
 	}
 
 	return &ParquetWriter{
+		options:      options,
 		descriptor:   descriptor,
 		tables:       tables,
 		tablesByName: tablesByName,

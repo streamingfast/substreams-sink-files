@@ -15,10 +15,9 @@ import (
 	"github.com/parquet-go/parquet-go/encoding"
 	"github.com/parquet-go/parquet-go/format"
 	parquetpb "github.com/streamingfast/substreams-sink-files/pb/parquet"
+	pbparquet "github.com/streamingfast/substreams-sink-files/pb/parquet"
 	"github.com/streamingfast/substreams-sink-files/protox"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 var (
@@ -27,8 +26,8 @@ var (
 	Uncompressed = &uncompressed.Codec{}
 )
 
-func SchemaFromMessageDescriptor(descriptor protoreflect.MessageDescriptor) *parquet.Schema {
-	return parquet.NewSchema(string(descriptor.Name()), newMessageNode(descriptor))
+func SchemaFromMessageDescriptor(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression) *parquet.Schema {
+	return parquet.NewSchema(string(descriptor.Name()), newMessageNode(descriptor, defaultColumnCompression))
 }
 
 type TableResult struct {
@@ -43,13 +42,13 @@ func tableResult(descriptor protoreflect.MessageDescriptor, schema *parquet.Sche
 	}
 }
 
-func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor) (out []TableResult, rowExtractor ProtoRowExtractor) {
+func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression) (out []TableResult, rowExtractor ProtoRowExtractor) {
 	protox.WalkMessageDescriptors(descriptor, func(child protoreflect.MessageDescriptor) {
 		if tableName, hasTableName := GetMessageTableName(child); hasTableName {
 			// We've got `option (parquet.table_name)` set, let's create a table for it
 			out = append(out, tableResult(
 				child,
-				parquet.NewSchema(tableName, newMessageNode(child)),
+				parquet.NewSchema(tableName, newMessageNode(child, defaultColumnCompression)),
 			))
 		}
 	})
@@ -69,7 +68,7 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor) (o
 		return []TableResult{
 			tableResult(
 				descriptor,
-				parquet.NewSchema(tableName, newMessageNode(descriptor)),
+				parquet.NewSchema(tableName, newMessageNode(descriptor, defaultColumnCompression)),
 			),
 		}, ProtoRowExtractorFromRoot(tableName)
 	}
@@ -89,7 +88,7 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor) (o
 		tableName := strcase.ToSnake(field.JSONName())
 		out = append(out, tableResult(
 			field.Message(),
-			parquet.NewSchema(tableName, newMessageNode(field.Message())),
+			parquet.NewSchema(tableName, newMessageNode(field.Message(), defaultColumnCompression)),
 		))
 
 		repeatedFields[tableName] = field
@@ -99,42 +98,20 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor) (o
 }
 
 func GetMessageTableName(descriptor protoreflect.MessageDescriptor) (string, bool) {
-	options, hasOptions := descriptor.Options().(*descriptorpb.MessageOptions)
-	if !hasOptions || options == nil {
-		return "", false
-	}
-
-	if !proto.HasExtension(options, parquetpb.E_TableName) {
-		return "", false
-	}
-
-	return proto.GetExtension(options, parquetpb.E_TableName).(string), true
+	return protox.GetMessageExtensionValue(descriptor, parquetpb.E_TableName, "")
 }
 
 func IsFieldIgnored(field protoreflect.FieldDescriptor) bool {
-	options, hasOptions := field.Options().(*descriptorpb.FieldOptions)
-	if !hasOptions || options == nil {
-		return false
-	}
-
-	if !proto.HasExtension(options, parquetpb.E_Ignored) {
-		return false
-	}
-
-	return proto.GetExtension(options, parquetpb.E_Ignored).(bool)
+	ignored, _ := protox.GetFieldExtensionValue(field, parquetpb.E_Ignored, false)
+	return ignored
 }
 
 func GetFieldColumnType(field protoreflect.FieldDescriptor) (parquetpb.ColumnType, bool) {
-	options, hasOptions := field.Options().(*descriptorpb.FieldOptions)
-	if !hasOptions || options == nil {
-		return parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE, false
+	if columnDef, _ := protox.GetFieldExtensionValue(field, parquetpb.E_Column, (*pbparquet.Column)(nil)); columnDef.GetType() != pbparquet.ColumnType_UNSPECIFIED_COLUMN_TYPE {
+		return *columnDef.Type, true
 	}
 
-	if !proto.HasExtension(options, parquetpb.E_ColumnType) {
-		return parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE, false
-	}
-
-	return proto.GetExtension(options, parquetpb.E_ColumnType).(parquetpb.ColumnType), proto.HasExtension(options, parquetpb.E_ColumnType)
+	return parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE, false
 }
 
 var _ parquet.Node = (*messageNode)(nil)
@@ -144,7 +121,7 @@ type messageNode struct {
 	fields     []parquet.Field
 }
 
-func newMessageNode(descriptor protoreflect.MessageDescriptor) *messageNode {
+func newMessageNode(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression) *messageNode {
 	fields := descriptor.Fields()
 	parquetFields := make([]parquet.Field, 0, fields.Len())
 	for i := 0; i < fields.Len(); i++ {
@@ -153,7 +130,7 @@ func newMessageNode(descriptor protoreflect.MessageDescriptor) *messageNode {
 			continue
 		}
 
-		parquetFields = append(parquetFields, toParquetField(field))
+		parquetFields = append(parquetFields, toParquetField(field, defaultColumnCompression))
 	}
 
 	return &messageNode{
@@ -162,16 +139,29 @@ func newMessageNode(descriptor protoreflect.MessageDescriptor) *messageNode {
 	}
 }
 
-func toParquetField(field protoreflect.FieldDescriptor) parquet.Field {
+func toParquetField(field protoreflect.FieldDescriptor, defaultColumnCompression *pbparquet.Compression) parquet.Field {
+	columnDef, hasColumnDef := protox.GetFieldExtensionValue(field, parquetpb.E_Column, (*pbparquet.Column)(nil))
+
+	node := protoFieldToParquetNode(field, columnDef)
+
+	// If a compression is explicitly set on the column, it has precedence over the default column compression
+	if hasColumnDef && columnDef.Compression != nil {
+		if columnDef.GetCompression() != parquetpb.Compression_UNCOMPRESSED {
+			node = parquet.Compressed(node, compressionToParquetCompressionCodec(columnDef.GetCompression()))
+		}
+	} else if defaultColumnCompression != nil && *defaultColumnCompression != pbparquet.Compression_UNCOMPRESSED {
+		node = parquet.Compressed(node, compressionToParquetCompressionCodec(*defaultColumnCompression))
+	}
+
 	return &messageField{
-		Node:      protoFieldToParquetNode(field),
+		Node:      node,
 		fieldName: string(field.Name()),
 	}
 }
 
-func protoFieldToParquetNode(field protoreflect.FieldDescriptor) parquet.Node {
-	if columnType, hasColumnType := GetFieldColumnType(field); hasColumnType && columnType != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
-		return columnTypeOptionToParquetNode(columnType)
+func protoFieldToParquetNode(field protoreflect.FieldDescriptor, columnDef *pbparquet.Column) parquet.Node {
+	if columnDef.GetType() != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
+		return columnTypeOptionToParquetNode(columnDef.GetType())
 	}
 
 	switch field.Kind() {
@@ -207,6 +197,25 @@ func protoFieldToParquetNode(field protoreflect.FieldDescriptor) parquet.Node {
 
 	default:
 		panic(fmt.Errorf("field %s is of kind %s which is not supported yet", field.FullName(), field.Kind()))
+	}
+}
+
+func compressionToParquetCompressionCodec(compression parquetpb.Compression) compress.Codec {
+	switch compression {
+	case parquetpb.Compression_UNCOMPRESSED:
+		return Uncompressed
+	case parquetpb.Compression_SNAPPY:
+		return &parquet.Snappy
+	case parquetpb.Compression_GZIP:
+		return &parquet.Gzip
+	case parquetpb.Compression_LZ4_RAW:
+		return &parquet.Lz4Raw
+	case parquetpb.Compression_BROTLI:
+		return &parquet.Brotli
+	case parquetpb.Compression_ZSTD:
+		return &parquet.Zstd
+	default:
+		panic(fmt.Errorf("compression %s is not supported yet", compression))
 	}
 }
 
@@ -270,18 +279,14 @@ func (m *messageNode) Required() bool {
 
 // String implements parquet.Node.
 func (m *messageNode) String() string {
-	return sprint("", m)
+	s := new(strings.Builder)
+	parquet.PrintSchema(s, "", m)
+	return s.String()
 }
 
 // Type implements parquet.Node.
 func (m *messageNode) Type() parquet.Type {
 	return groupType{}
-}
-
-func sprint(name string, node parquet.Node) string {
-	s := new(strings.Builder)
-	parquet.PrintSchema(s, name, node)
-	return s.String()
 }
 
 var _ parquet.Field = messageField{}

@@ -14,8 +14,14 @@ extend google.protobuf.MessageOptions {
 
 extend google.protobuf.FieldOptions {
   bool ignored = 548935;
-  ColumnType column_type = 548936;
-  TimestampType timestamp_type = 548937;
+  optional Column column = 548936;
+}
+
+message Column {
+  // Not implemented yet but planned so we reserved the field id now
+  // optional string name = 1;
+  optional ColumnType type = 2;
+  optional Compression compression = 3;
 }
 
 enum ColumnType {
@@ -24,10 +30,11 @@ enum ColumnType {
   INT256 = 2;
 }
 
-enum TimestampType {
-  UNSPECIFIED_TIMESTAMP_TYPE = 0;
-  TIMESTAMP_MILLIS = 1;
-  TIMESTAMP_MICROS = 2;
-  TIMESTAMP_NANOS = 3;
+enum Compression {
+  UNCOMPRESSED = 0;
+  SNAPPY = 1;
+  GZIP = 2;
+  LZ4_RAW = 3;
+  BROTLI = 4;
+  ZSTD = 5;
 }
-

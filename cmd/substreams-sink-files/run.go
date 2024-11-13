@@ -51,6 +51,8 @@ var SyncRunCmd = Command(syncRunE,
 
 			Default value for the buffer is 64 MiB.
 		`))
+
+		addCommonParquetFlags(flags)
 	}),
 	ExamplePrefixed("substreams-sink-files run",
 		"mainnet.eth.streamingfast.io:443 substreams.spkg map_transfers '.transfers[]' ./localdata",
@@ -137,12 +139,14 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		}
 
 	case encoderType == "parquet":
+		flagValues := readCommonParquetFlags(cmd)
+
 		msgDesc, err := outputProtoreflectMessageDescriptor(sinker)
 		if err != nil {
 			return fmt.Errorf("output module message descriptor: %w", err)
 		}
 
-		parquetWriter, err := writer.NewParquetWriter(msgDesc)
+		parquetWriter, err := writer.NewParquetWriter(msgDesc, flagValues.AsParquetWriterOptions()...)
 		if err != nil {
 			return fmt.Errorf("new parquet writer: %w", err)
 		}

@@ -28,7 +28,7 @@ func TestSchemaFromMessageDescriptor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			schema := SchemaFromMessageDescriptor(tt.args)
+			schema := SchemaFromMessageDescriptor(tt.args, nil)
 			schemaString := strings.ReplaceAll(schema.String(), "\t", "  ")
 
 			assert.Equal(t, tt.schema, schemaString)
