@@ -146,7 +146,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("output module message descriptor: %w", err)
 		}
 
-		parquetWriter, err := writer.NewParquetWriter(msgDesc, flagValues.AsParquetWriterOptions()...)
+		parquetWriter, err := writer.NewParquetWriter(msgDesc, zlog, tracer, flagValues.AsParquetWriterOptions()...)
 		if err != nil {
 			return fmt.Errorf("new parquet writer: %w", err)
 		}

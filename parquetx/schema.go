@@ -7,6 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/bobg/go-generics/v2/slices"
 	"github.com/iancoleman/strcase"
 	"github.com/parquet-go/parquet-go"
 	"github.com/parquet-go/parquet-go/compress"
@@ -14,9 +15,12 @@ import (
 	"github.com/parquet-go/parquet-go/deprecated"
 	"github.com/parquet-go/parquet-go/encoding"
 	"github.com/parquet-go/parquet-go/format"
+	"github.com/streamingfast/logging"
 	parquetpb "github.com/streamingfast/substreams-sink-files/pb/parquet"
 	pbparquet "github.com/streamingfast/substreams-sink-files/pb/parquet"
 	"github.com/streamingfast/substreams-sink-files/protox"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -27,7 +31,12 @@ var (
 )
 
 func SchemaFromMessageDescriptor(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression) *parquet.Schema {
-	return parquet.NewSchema(string(descriptor.Name()), newMessageNode(descriptor, defaultColumnCompression))
+	name := string(descriptor.Name())
+	if tableName, hasTableName := GetMessageTableName(descriptor); hasTableName {
+		name = tableName
+	}
+
+	return parquet.NewSchema(name, newMessageNode(descriptor, defaultColumnCompression))
 }
 
 type TableResult struct {
@@ -42,9 +51,11 @@ func tableResult(descriptor protoreflect.MessageDescriptor, schema *parquet.Sche
 	}
 }
 
-func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression) (out []TableResult, rowExtractor ProtoRowExtractor) {
-	protox.WalkMessageDescriptors(descriptor, func(child protoreflect.MessageDescriptor) {
+func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression, logger *zap.Logger, tracer logging.Tracer) (out []TableResult, rowExtractor ProtoRowExtractor) {
+	protox.WalkMessageDescriptors(descriptor, logger, tracer, func(child protoreflect.MessageDescriptor) {
 		if tableName, hasTableName := GetMessageTableName(child); hasTableName {
+			logger.Debug("found protobuf message with parquet table extension", zap.String("table_name", tableName), zap.String("message_name", string(child.Name())))
+
 			// We've got `option (parquet.table_name)` set, let's create a table for it
 			out = append(out, tableResult(
 				child,
@@ -55,6 +66,12 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, de
 
 	// If we found any specific tables, we stop there
 	if len(out) > 0 {
+		if entry := logger.Check(zapcore.DebugLevel, "found tables in message descriptor"); entry != nil {
+			entry.Write(zap.Strings("tables", slices.Map(out, func(x TableResult) string {
+				return fmt.Sprintf("%s (%s)", x.Schema.Name(), x.Descriptor.FullName())
+			})))
+		}
+
 		return out, ProtoRowExtractorFromTables(out)
 	}
 
@@ -159,10 +176,25 @@ func toParquetField(field protoreflect.FieldDescriptor, defaultColumnCompression
 	}
 }
 
-func protoFieldToParquetNode(field protoreflect.FieldDescriptor, columnDef *pbparquet.Column) parquet.Node {
+func protoFieldToParquetNode(field protoreflect.FieldDescriptor, columnDef *pbparquet.Column) (out parquet.Node) {
 	if columnDef.GetType() != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
 		return columnTypeOptionToParquetNode(columnDef.GetType())
 	}
+
+	if tracer.Enabled() {
+		zlog.Debug("proto field to parquet node", zap.String("field", string(field.FullName())), zap.Stringer("kind", field.Kind()), zap.Bool("repeated", field.IsList()))
+	}
+
+	defer func() {
+		if field.IsList() {
+			fieldKind := field.Kind()
+			if fieldKind == protoreflect.MessageKind || fieldKind == protoreflect.GroupKind {
+				panic(fmt.Errorf("repeated field %s is of kind protoreflect.MessageKind or protoreflect.GroupKind which is not supported for list type yet", field.FullName()))
+			}
+
+			out = parquet.Repeated(out)
+		}
+	}()
 
 	switch field.Kind() {
 	case protoreflect.StringKind:

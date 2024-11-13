@@ -25,6 +25,15 @@ func TestSchemaFromMessageDescriptor(t *testing.T) {
 				}
 			`),
 		},
+		{
+			"repeated string field",
+			(&pbtesting.RowColumnRepeatedString{}).ProtoReflect().Descriptor(),
+			schemaLiteral(`
+                message rows {
+                  repeated binary values (STRING);
+                }
+			`),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

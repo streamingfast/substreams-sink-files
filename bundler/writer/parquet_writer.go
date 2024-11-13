@@ -11,9 +11,11 @@ import (
 	"github.com/parquet-go/parquet-go"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/substreams-sink-files/parquetx"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/multierr"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
@@ -34,13 +36,13 @@ type ParquetWriter struct {
 	rowsBufferByTableName map[string]*parquet.RowBuffer[any]
 }
 
-func NewParquetWriter(descriptor protoreflect.MessageDescriptor, opts ...ParquetWriterOption) (*ParquetWriter, error) {
+func NewParquetWriter(descriptor protoreflect.MessageDescriptor, logger *zap.Logger, tracer logging.Tracer, opts ...ParquetWriterOption) (*ParquetWriter, error) {
 	options, err := NewParquetWriterOptions(opts)
 	if err != nil {
 		return nil, fmt.Errorf("invalid parquet writer options: %w", err)
 	}
 
-	tables, rowExtractor := parquetx.FindTablesInMessageDescriptor(descriptor, options.DefaultColumnCompression)
+	tables, rowExtractor := parquetx.FindTablesInMessageDescriptor(descriptor, options.DefaultColumnCompression, logger, tracer)
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("no tables found in message descriptor")
 	}

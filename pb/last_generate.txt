@@ -1,2 +1,2 @@
-generate.sh - Wed Nov 13 02:17:52 EST 2024 - maoueh
-streamingfast/substreams-sink-files revision: 86f931adbd4371d11d68e3a0ef842920e4b6f61b
+generate.sh - Wed Nov 13 10:01:01 EST 2024 - maoueh
+streamingfast/substreams-sink-files revision: b7cf1b512d2172265116da5cef1ee416882700eb

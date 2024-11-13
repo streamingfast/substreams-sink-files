@@ -8,6 +8,7 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/parquet-go/parquet-go"
+	"github.com/parquet-go/parquet-go/sparse"
 	parquetpb "github.com/streamingfast/substreams-sink-files/pb/parquet"
 	"github.com/streamingfast/substreams-sink-files/protox"
 	"go.uber.org/zap"
@@ -64,11 +65,14 @@ func ProtoRowExtractorFromTables(tables []TableResult) ProtoRowExtractor {
 					)
 				}
 
-				if IsFieldIgnored(field) {
+				if ignored {
 					continue
 				}
 
 				if field.Kind() != protoreflect.MessageKind && !field.IsList() {
+					if tracer.Enabled() {
+						zlog.Debug("skipping field descriptor, not message kind and not list type", zap.String("field", string(field.FullName())))
+					}
 					continue
 				}
 
@@ -125,6 +129,17 @@ func ProtoRowExtractorFromTables(tables []TableResult) ProtoRowExtractor {
 			}
 
 			return nil
+		}
+
+		// Maybe the root message is a table itself, so we need to process it
+		rootDescriptor := root.Descriptor()
+		if schema, found := tablesByMessage[rootDescriptor.FullName()]; found {
+			row, err := ProtoMessageToRow(root)
+			if err != nil {
+				return nil, fmt.Errorf("converting message %q to row: %w", rootDescriptor.FullName(), err)
+			}
+
+			out[schema.Name()] = append(out[schema.Name()], row)
 		}
 
 		if err := processNode(root); err != nil {
@@ -219,6 +234,16 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 		case protoreflect.DoubleKind:
 			columns = append(columns, parquet.DoubleValue(value.Float()))
 		case protoreflect.StringKind:
+			if field.IsList() {
+				fieldList := value.List()
+				elements := make([]string, fieldList.Len())
+				for i := 0; i < fieldList.Len(); i++ {
+					elements[i] = fieldList.Get(i).String()
+				}
+
+				columns = append(columns, sparse.MakeStringArray(elements))
+			}
+
 			columns = append(columns, parquet.ByteArrayValue([]byte(value.String())))
 		case protoreflect.BytesKind:
 			columns = append(columns, parquet.ByteArrayValue(value.Bytes()))

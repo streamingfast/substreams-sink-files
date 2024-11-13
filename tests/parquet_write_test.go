@@ -258,6 +258,10 @@ func TestParquetWriter(t *testing.T) {
 		},
 	})
 
+	type GoRowColumnCompressionZstd struct {
+		Value string `parquet:"value" db:"value"`
+	}
+
 	runCases(t, []parquetWriterCase[GoRowColumnCompressionZstd]{
 		{
 			name: "parquet column compression zstd",
@@ -269,6 +273,26 @@ func TestParquetWriter(t *testing.T) {
 			expectedRows: map[string][]GoRowColumnCompressionZstd{
 				"row_column_compression_zstd": {
 					GoRowColumnCompressionZstd{Value: "abc-0"},
+				},
+			},
+		},
+	})
+
+	type GoRowColumnRepeatedString struct {
+		Values []string `parquet:"values" db:"values"`
+	}
+
+	runCases(t, []parquetWriterCase[GoRowColumnRepeatedString]{
+		{
+			name: "protobuf table with column repeated string",
+			outputModules: []proto.Message{
+				&pbtesting.RowColumnRepeatedString{
+					Values: []string{"abc-0", "abc-1"},
+				},
+			},
+			expectedRows: map[string][]GoRowColumnRepeatedString{
+				"rows": {
+					GoRowColumnRepeatedString{Values: []string{"abc-0", "abc-1"}},
 				},
 			},
 		},
@@ -298,7 +322,7 @@ func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
 			}
 
 			ctx := context.Background()
-			writer, err := writer.NewParquetWriter(descriptor, testCase.writerOptions...)
+			writer, err := writer.NewParquetWriter(descriptor, testLogger, testTracer, testCase.writerOptions...)
 			require.NoError(t, err)
 
 			err = writer.StartBoundary(bstream.NewRangeExcludingEnd(0, 1000))
@@ -335,7 +359,7 @@ func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
 			}
 
 			for _, driver := range drivers {
-				t.Run(testCase.name+" ("+driver+")", func(t *testing.T) {
+				t.Run(driver, func(t *testing.T) {
 					for tableName, expectedRows := range testCase.expectedRows {
 						storeFilename := tableName + "/" + "0000000000-0000001000.parquet"
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -99,19 +100,20 @@ func MessageRepeatedFieldNames(descriptor protoreflect.MessageDescriptor) (field
 // The function stops recursion if the same node is visited more than once.
 //
 // It follows the fields message recursively and also the repeated fields that are messages.
-func WalkMessageDescriptors(root protoreflect.MessageDescriptor, onChild func(onChild protoreflect.MessageDescriptor)) {
+func WalkMessageDescriptors(root protoreflect.MessageDescriptor, logger *zap.Logger, tracer logging.Tracer, onMessageDescriptor func(messageDescriptor protoreflect.MessageDescriptor)) {
 	seenNodes := make(map[protoreflect.FullName]bool, 0)
 
 	var inner func(node protoreflect.MessageDescriptor)
 	inner = func(node protoreflect.MessageDescriptor) {
 		if exists := seenNodes[node.FullName()]; exists {
+			logger.Debug("already visited message descriptor", zap.String("message", string(node.FullName())))
 			// Stop recursion if we already visited this node
 			return
 		}
 
 		seenNodes[node.FullName()] = true
 		if tracer.Enabled() {
-			zlog.Debug("walking message descriptor", zap.String("message", string(node.FullName())))
+			logger.Debug("walking message descriptor", zap.String("message", string(node.FullName())))
 		}
 
 		fields := node.Fields()
@@ -119,7 +121,7 @@ func WalkMessageDescriptors(root protoreflect.MessageDescriptor, onChild func(on
 			field := fields.Get(i)
 
 			if tracer.Enabled() {
-				zlog.Debug("message field descriptor",
+				logger.Debug("message field descriptor",
 					zap.String("field", string(field.FullName())),
 					zap.Stringer("kind", field.Kind()),
 					zap.Bool("is_list", field.IsList()),
@@ -136,11 +138,13 @@ func WalkMessageDescriptors(root protoreflect.MessageDescriptor, onChild func(on
 				continue
 			}
 
-			onChild(message)
+			onMessageDescriptor(message)
 			inner(message)
 			continue
 		}
 	}
 
+	// The root itself must be visited as it might have a table extension making it a table
+	onMessageDescriptor(root)
 	inner(root)
 }

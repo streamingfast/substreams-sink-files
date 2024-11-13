@@ -6,8 +6,8 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-func GetMessageExtensionValue[T any](field protoreflect.MessageDescriptor, extensionType protoreflect.ExtensionType, defaultIfUnset T) (value T, found bool) {
-	return getExtensionValue[T, *descriptorpb.MessageOptions](field, extensionType, defaultIfUnset)
+func GetMessageExtensionValue[T any](message protoreflect.MessageDescriptor, extensionType protoreflect.ExtensionType, defaultIfUnset T) (value T, found bool) {
+	return getExtensionValue[T, *descriptorpb.MessageOptions](message, extensionType, defaultIfUnset)
 }
 
 func GetFieldExtensionValue[T any](field protoreflect.FieldDescriptor, extensionType protoreflect.ExtensionType, defaultIfUnset T) (value T, found bool) {
