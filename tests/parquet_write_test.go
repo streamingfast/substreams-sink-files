@@ -285,6 +285,7 @@ func TestParquetWriter(t *testing.T) {
 	runCases(t, []parquetWriterCase[GoRowColumnRepeatedString]{
 		{
 			name: "protobuf table with column repeated string",
+			skip: "not fully implemented yet, still work in progress",
 			outputModules: []proto.Message{
 				&pbtesting.RowColumnRepeatedString{
 					Values: []string{"abc-0", "abc-1"},

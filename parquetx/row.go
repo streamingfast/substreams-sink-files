@@ -8,7 +8,6 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/parquet-go/parquet-go"
-	"github.com/parquet-go/parquet-go/sparse"
 	parquetpb "github.com/streamingfast/substreams-sink-files/pb/parquet"
 	"github.com/streamingfast/substreams-sink-files/protox"
 	"go.uber.org/zap"
@@ -241,7 +240,8 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 					elements[i] = fieldList.Get(i).String()
 				}
 
-				columns = append(columns, sparse.MakeStringArray(elements))
+				// columns = append(columns, sparse.MakeStringArray(elements))
+				panic("it's still unknown how to turn a []string into a 'parquet.Value' type representing a repeated string")
 			}
 
 			columns = append(columns, parquet.ByteArrayValue([]byte(value.String())))

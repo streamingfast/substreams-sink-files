@@ -52,7 +52,7 @@ func toolsParquetSchemaE(cmd *cobra.Command, args []string) error {
 	parquetWriterOptions, err := writer.NewParquetWriterOptions(readCommonParquetFlags(cmd).AsParquetWriterOptions())
 	cli.NoError(err, "Failed to create parquet writer options")
 
-	tables, _ := parquetx.FindTablesInMessageDescriptor(descriptor, parquetWriterOptions.DefaultColumnCompression, zlog)
+	tables, _ := parquetx.FindTablesInMessageDescriptor(descriptor, parquetWriterOptions.DefaultColumnCompression, zlog, tracer)
 	if len(tables) == 0 {
 		fmt.Printf("No tables found or inferred in message descriptor %q\n", descriptor.FullName())
 		os.Exit(1)
