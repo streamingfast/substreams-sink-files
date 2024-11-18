@@ -1,10 +1,10 @@
 package parquetx
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math/big"
 	"strings"
+	"unsafe"
 
 	"github.com/holiman/uint256"
 	"github.com/parquet-go/parquet-go"
@@ -321,16 +321,24 @@ func columnTypeUint256ToParquetValue(field protoreflect.FieldDescriptor, value p
 			}
 		}
 
-		// Seems we need to be in little endian, number.Bytes32() doesn't work, is it a problem with Parquet writer?
-		data := make([]byte, 32)
-		binary.LittleEndian.PutUint64(data[0:8], number[0])
-		binary.LittleEndian.PutUint64(data[8:16], number[1])
-		binary.LittleEndian.PutUint64(data[16:24], number[2])
-		binary.LittleEndian.PutUint64(data[24:32], number[3])
-
 		// We **must** use a []byte of exactly 32 bytes, otherwise the parquet writer skip the row.
 		// See https://github.com/parquet-go/parquet-go/issues/178
-		return parquet.FixedLenByteArrayValue(data), nil
+
+		// So further research leads to fact that different reader of Parquet will read the data in
+		// different format. It seems also that physical/logical types affects the way the data is read.
+		//
+		// Clickhouse on Physical: FixedByte(32) and Logical: Decimal(N, 0) expects the data to be in big-endian format.
+		// Clickhouse on Physical: FixedByte(32) and Logical: None expects the data to be in little-endian format.
+		//
+		// The more natural way would be to use big-endian format, keep little endian for now until
+		// further research is done.
+		unsafe := (*[32]byte)(unsafe.Pointer(number))
+		data := *unsafe
+
+		// Big-endian version would be
+		// data := number.Bytes32()
+
+		return parquet.ByteArrayValue(data[:]), nil
 
 	default:
 		return out, fmt.Errorf("unsupported conversion from field kind %s to column value of type %s", field.Kind(), parquetpb.ColumnType_UINT256)

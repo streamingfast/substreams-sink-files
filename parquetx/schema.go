@@ -254,10 +254,10 @@ func compressionToParquetCompressionCodec(compression parquetpb.Compression) com
 func columnTypeOptionToParquetNode(columnType parquetpb.ColumnType) parquet.Node {
 	switch columnType {
 	case parquetpb.ColumnType_INT256:
-		return parquet.Leaf(parquet.FixedLenByteArrayType(32))
+		return parquet.Leaf(u256FixedType)
 
 	case parquetpb.ColumnType_UINT256:
-		return parquet.Leaf(parquet.FixedLenByteArrayType(32))
+		return parquet.Leaf(u256FixedType)
 
 	default:
 		panic(fmt.Errorf("column type %s is not supported yet", columnType))

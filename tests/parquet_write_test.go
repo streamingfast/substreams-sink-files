@@ -228,10 +228,14 @@ func TestParquetWriter(t *testing.T) {
 				&pbtesting.RowColumnTypeUint256{
 					Amount: "999925881158281189828",
 				},
+				&pbtesting.RowColumnTypeUint256{
+					Amount: "89038154470531593666498931021702688443885319554480928852458527515161026101248",
+				},
 			},
 			expectedRows: map[string][]GoRowColumnTypeUint256{
 				"row_column_type_uint_256": {
 					GoRowColumnTypeUint256{Amount: uint256("999925881158281189828")},
+					GoRowColumnTypeUint256{Amount: uint256("89038154470531593666498931021702688443885319554480928852458527515161026101248")},
 				},
 			},
 		},
@@ -591,4 +595,14 @@ func (b *Uint256) Scan(value interface{}) error {
 
 type GoRowColumnCompressionZstd struct {
 	Value string `parquet:"value" db:"value"`
+}
+
+func TestUint256_MaxDigits(t *testing.T) {
+	bytes := make([]byte, 32)
+	for i := 0; i < 32; i++ {
+		bytes[i] = 0xff
+	}
+
+	i := new(big.Int).SetBytes(bytes[:])
+	require.Equal(t, "115792089237316195423570985008687907853269984665640564039457584007913129639935", i.Text(10))
 }
