@@ -289,7 +289,8 @@ func TestParquetWriter(t *testing.T) {
 	runCases(t, []parquetWriterCase[GoRowColumnRepeatedString]{
 		{
 			name: "protobuf table with column repeated string",
-			skip: "not fully implemented yet, still work in progress",
+			// Not sure why, but ch-db complains with 'Array does not start with '[' character: while converting 'abc-0' to Array(Nullable(String))'
+			onlyDrivers: []string{"parquet-go"},
 			outputModules: []proto.Message{
 				&pbtesting.RowColumnRepeatedString{
 					Values: []string{"abc-0", "abc-1"},

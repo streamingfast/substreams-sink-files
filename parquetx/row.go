@@ -197,8 +197,16 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 	fields := messageDesc.Fields()
 
 	// We preallocate the columns slice to the maximum number of fields, but we might skip some
-	// fields if they are ignored.
+	// fields if they are ignored. Also, repeated fields will be turned into multiple parquet.Value
+	// sequentially, so we might have much more values than columns in those case.
 	columns := make([]parquet.Value, 0, fields.Len())
+
+	columnIndex := 0
+	addColumn := func(values ...parquet.Value) {
+		columns = append(columns, values...)
+		columnIndex++
+	}
+
 	for i := 0; i < fields.Len(); i++ {
 		field := fields.Get(i)
 		if IsFieldIgnored(field) {
@@ -208,60 +216,75 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 		value := message.Get(field)
 
 		if columnType, found := GetFieldColumnType(field); found && columnType != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
-			column, err := protoValueToColumnTypeValue(columnType, field, value)
+			value, err := protoValueToColumnTypeValue(columnType, field, value)
 			if err != nil {
 				return nil, fmt.Errorf("converting field %q to column value: %w", field.FullName(), err)
 			}
 
-			columns = append(columns, column)
+			addColumn(value)
 			continue
 		}
 
-		switch field.Kind() {
-		case protoreflect.BoolKind:
-			columns = append(columns, parquet.BooleanValue(value.Bool()))
-		case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
-			columns = append(columns, parquet.Int32Value(int32(value.Int())))
-		case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
-			columns = append(columns, parquet.Int64Value(value.Int()))
-		case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
-			columns = append(columns, parquet.Int32Value(int32(value.Uint())))
-		case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-			columns = append(columns, parquet.Int64Value(int64(value.Uint())))
-		case protoreflect.FloatKind:
-			columns = append(columns, parquet.FloatValue(float32(value.Float())))
-		case protoreflect.DoubleKind:
-			columns = append(columns, parquet.DoubleValue(value.Float()))
-		case protoreflect.StringKind:
-			if field.IsList() {
-				fieldList := value.List()
-				elements := make([]string, fieldList.Len())
-				for i := 0; i < fieldList.Len(); i++ {
-					elements[i] = fieldList.Get(i).String()
+		if field.IsList() {
+			fieldList := value.List()
+			sliceValues := make([]parquet.Value, fieldList.Len())
+			for i := 0; i < fieldList.Len(); i++ {
+				sliceValue, err := protoLeafToValue(field, fieldList.Get(i))
+				if err != nil {
+					return nil, fmt.Errorf("converting leaf field %s @ index %d: %w", field.FullName(), i, err)
 				}
 
-				// columns = append(columns, sparse.MakeStringArray(elements))
-				panic("it's still unknown how to turn a []string into a 'parquet.Value' type representing a repeated string")
+				repetitionLevel := i
+				if repetitionLevel != 0 {
+					repetitionLevel = 1
+				}
+
+				sliceValues[i] = sliceValue.Level(repetitionLevel, 1, columnIndex)
 			}
 
-			columns = append(columns, parquet.ByteArrayValue([]byte(value.String())))
-		case protoreflect.BytesKind:
-			columns = append(columns, parquet.ByteArrayValue(value.Bytes()))
-
-		case protoreflect.MessageKind:
-			if protox.IsWellKnownTimestampField(field) {
-				columns = append(columns, parquet.Int64Value(protox.DynamicAsTimestampTime(value.Message()).UnixNano()))
-				continue
-			}
-
-			columns = append(columns, parquet.ValueOf(value.Interface()))
-
-		default:
-			return nil, fmt.Errorf("field %s is of type %s which isn't supported yet", field.FullName(), field.Kind())
+			addColumn(sliceValues...)
+			continue
 		}
+
+		leafValue, err := protoLeafToValue(field, value)
+		if err != nil {
+			return nil, fmt.Errorf("converting leaf field %s: %w", field.FullName(), err)
+		}
+
+		addColumn(leafValue)
+		continue
 	}
 
 	return parquet.Row(columns), nil
+}
+
+func protoLeafToValue(field protoreflect.FieldDescriptor, value protoreflect.Value) (out parquet.Value, err error) {
+	switch field.Kind() {
+	case protoreflect.BoolKind:
+		return parquet.BooleanValue(value.Bool()), nil
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		return parquet.Int32Value(int32(value.Int())), nil
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		return parquet.Int64Value(value.Int()), nil
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		return parquet.Int32Value(int32(value.Uint())), nil
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		return parquet.Int64Value(int64(value.Uint())), nil
+	case protoreflect.FloatKind:
+		return parquet.FloatValue(float32(value.Float())), nil
+	case protoreflect.DoubleKind:
+		return parquet.DoubleValue(value.Float()), nil
+	case protoreflect.StringKind:
+		return parquet.ByteArrayValue([]byte(value.String())), nil
+	case protoreflect.BytesKind:
+		return parquet.ByteArrayValue(value.Bytes()), nil
+	case protoreflect.MessageKind:
+		if protox.IsWellKnownTimestampField(field) {
+			return parquet.Int64Value(protox.DynamicAsTimestampTime(value.Message()).UnixNano()), nil
+		}
+	}
+
+	return out, fmt.Errorf("type %s isn't supported yet as a leaf node", field.Kind())
 }
 
 func protoValueToColumnTypeValue(columnType parquetpb.ColumnType, field protoreflect.FieldDescriptor, value protoreflect.Value) (out parquet.Value, err error) {
