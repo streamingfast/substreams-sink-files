@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"unsafe"
 
 	"github.com/holiman/uint256"
 	"github.com/parquet-go/parquet-go"
@@ -355,13 +354,13 @@ func columnTypeUint256ToParquetValue(field protoreflect.FieldDescriptor, value p
 		//
 		// The more natural way would be to use big-endian format, keep little endian for now until
 		// further research is done.
-		unsafe := (*[32]byte)(unsafe.Pointer(number))
-		data := *unsafe
+		// unsafe := (*[32]byte)(unsafe.Pointer(number))
+		// data := *unsafe
 
-		// Big-endian version would be
-		// data := number.Bytes32()
+		// Big-endian version
+		data := number.Bytes32()
 
-		return parquet.ByteArrayValue(data[:]), nil
+		return parquet.FixedLenByteArrayValue(data[:]), nil
 
 	default:
 		return out, fmt.Errorf("unsupported conversion from field kind %s to column value of type %s", field.Kind(), parquetpb.ColumnType_UINT256)
