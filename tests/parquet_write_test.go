@@ -372,6 +372,44 @@ func TestParquetWriter(t *testing.T) {
 			},
 		},
 	})
+
+	type GoRowColumnSandwichedOptional struct {
+		Prefix string  `parquet:"prefix" db:"prefix"`
+		Value  *string `parquet:"value,optional" db:"value,optional"`
+		Suffix string  `parquet:"suffix" db:"suffix"`
+	}
+
+	runCases(t, []parquetWriterCase[GoRowColumnSandwichedOptional]{
+		{
+			name: "protobuf table with sandwiched optional column string",
+			outputModules: []proto.Message{
+				&pbtesting.RowColumnSandwichedOptional{
+					Prefix: "prefix-0",
+					Value:  nil,
+					Suffix: "suffix-0",
+				},
+				&pbtesting.RowColumnSandwichedOptional{
+					Prefix: "prefix-1",
+					Value:  ptr("abc-1"),
+					Suffix: "suffix-1",
+				},
+			},
+			expectedRows: map[string][]GoRowColumnSandwichedOptional{
+				"rows": {
+					GoRowColumnSandwichedOptional{
+						Prefix: "prefix-0",
+						Value:  nil,
+						Suffix: "suffix-0",
+					},
+					GoRowColumnSandwichedOptional{
+						Prefix: "prefix-1",
+						Value:  ptr("abc-1"),
+						Suffix: "suffix-1",
+					},
+				},
+			},
+		},
+	})
 }
 
 func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
@@ -675,4 +713,8 @@ func TestUint256_MaxDigits(t *testing.T) {
 
 	i := new(big.Int).SetBytes(bytes[:])
 	require.Equal(t, "115792089237316195423570985008687907853269984665640564039457584007913129639935", i.Text(10))
+}
+
+func ptr[T any](s T) *T {
+	return &s
 }

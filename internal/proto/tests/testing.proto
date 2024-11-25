@@ -130,6 +130,14 @@ message RowColumnSandwichedRepeatedString {
     string suffix = 3;
 }
 
+message RowColumnSandwichedOptional {
+    option (parquet.table_name) = "rows";
+
+    string prefix = 1;
+    optional string value = 2;
+    string suffix = 3;
+}
+
 message IgnoredRow {
     string id = 1;
 }

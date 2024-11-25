@@ -1058,6 +1058,67 @@ func (x *RowColumnSandwichedRepeatedString) GetSuffix() string {
 	return ""
 }
 
+type RowColumnSandwichedOptional struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Prefix string  `protobuf:"bytes,1,opt,name=prefix,proto3" json:"prefix,omitempty"`
+	Value  *string `protobuf:"bytes,2,opt,name=value,proto3,oneof" json:"value,omitempty"`
+	Suffix string  `protobuf:"bytes,3,opt,name=suffix,proto3" json:"suffix,omitempty"`
+}
+
+func (x *RowColumnSandwichedOptional) Reset() {
+	*x = RowColumnSandwichedOptional{}
+	mi := &file_tests_testing_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RowColumnSandwichedOptional) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RowColumnSandwichedOptional) ProtoMessage() {}
+
+func (x *RowColumnSandwichedOptional) ProtoReflect() protoreflect.Message {
+	mi := &file_tests_testing_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RowColumnSandwichedOptional.ProtoReflect.Descriptor instead.
+func (*RowColumnSandwichedOptional) Descriptor() ([]byte, []int) {
+	return file_tests_testing_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *RowColumnSandwichedOptional) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+func (x *RowColumnSandwichedOptional) GetValue() string {
+	if x != nil && x.Value != nil {
+		return *x.Value
+	}
+	return ""
+}
+
+func (x *RowColumnSandwichedOptional) GetSuffix() string {
+	if x != nil {
+		return x.Suffix
+	}
+	return ""
+}
+
 type IgnoredRow struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1068,7 +1129,7 @@ type IgnoredRow struct {
 
 func (x *IgnoredRow) Reset() {
 	*x = IgnoredRow{}
-	mi := &file_tests_testing_proto_msgTypes[16]
+	mi := &file_tests_testing_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1080,7 +1141,7 @@ func (x *IgnoredRow) String() string {
 func (*IgnoredRow) ProtoMessage() {}
 
 func (x *IgnoredRow) ProtoReflect() protoreflect.Message {
-	mi := &file_tests_testing_proto_msgTypes[16]
+	mi := &file_tests_testing_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1093,7 +1154,7 @@ func (x *IgnoredRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IgnoredRow.ProtoReflect.Descriptor instead.
 func (*IgnoredRow) Descriptor() ([]byte, []int) {
-	return file_tests_testing_proto_rawDescGZIP(), []int{16}
+	return file_tests_testing_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *IgnoredRow) GetId() string {
@@ -1273,15 +1334,22 @@ var file_tests_testing_proto_rawDesc = []byte{
 	0x12, 0x16, 0x0a, 0x06, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09,
 	0x52, 0x06, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x73, 0x12, 0x16, 0x0a, 0x06, 0x73, 0x75, 0x66, 0x66,
 	0x69, 0x78, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x73, 0x75, 0x66, 0x66, 0x69, 0x78,
-	0x3a, 0x09, 0xd2, 0xbe, 0xa5, 0x38, 0x04, 0x72, 0x6f, 0x77, 0x73, 0x22, 0x1c, 0x0a, 0x0a, 0x49,
-	0x67, 0x6e, 0x6f, 0x72, 0x65, 0x64, 0x52, 0x6f, 0x77, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x42, 0x4e, 0x5a, 0x4c, 0x67, 0x69, 0x74,
-	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e,
-	0x67, 0x66, 0x61, 0x73, 0x74, 0x2f, 0x73, 0x75, 0x62, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x73,
-	0x2d, 0x73, 0x69, 0x6e, 0x6b, 0x2d, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x2f, 0x69, 0x6e, 0x74, 0x65,
-	0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x70, 0x62, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x67, 0x3b,
-	0x70, 0x62, 0x74, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x67, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f,
-	0x33,
+	0x3a, 0x09, 0xd2, 0xbe, 0xa5, 0x38, 0x04, 0x72, 0x6f, 0x77, 0x73, 0x22, 0x7d, 0x0a, 0x1b, 0x52,
+	0x6f, 0x77, 0x43, 0x6f, 0x6c, 0x75, 0x6d, 0x6e, 0x53, 0x61, 0x6e, 0x64, 0x77, 0x69, 0x63, 0x68,
+	0x65, 0x64, 0x4f, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x61, 0x6c, 0x12, 0x16, 0x0a, 0x06, 0x70, 0x72,
+	0x65, 0x66, 0x69, 0x78, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x70, 0x72, 0x65, 0x66,
+	0x69, 0x78, 0x12, 0x19, 0x0a, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x48, 0x00, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x88, 0x01, 0x01, 0x12, 0x16, 0x0a,
+	0x06, 0x73, 0x75, 0x66, 0x66, 0x69, 0x78, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x06, 0x73,
+	0x75, 0x66, 0x66, 0x69, 0x78, 0x3a, 0x09, 0xd2, 0xbe, 0xa5, 0x38, 0x04, 0x72, 0x6f, 0x77, 0x73,
+	0x42, 0x08, 0x0a, 0x06, 0x5f, 0x76, 0x61, 0x6c, 0x75, 0x65, 0x22, 0x1c, 0x0a, 0x0a, 0x49, 0x67,
+	0x6e, 0x6f, 0x72, 0x65, 0x64, 0x52, 0x6f, 0x77, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x42, 0x4e, 0x5a, 0x4c, 0x67, 0x69, 0x74, 0x68,
+	0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x69, 0x6e, 0x67,
+	0x66, 0x61, 0x73, 0x74, 0x2f, 0x73, 0x75, 0x62, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x73, 0x2d,
+	0x73, 0x69, 0x6e, 0x6b, 0x2d, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72,
+	0x6e, 0x61, 0x6c, 0x2f, 0x70, 0x62, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x67, 0x3b, 0x70,
+	0x62, 0x74, 0x65, 0x73, 0x74, 0x69, 0x6e, 0x67, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -1296,7 +1364,7 @@ func file_tests_testing_proto_rawDescGZIP() []byte {
 	return file_tests_testing_proto_rawDescData
 }
 
-var file_tests_testing_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_tests_testing_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_tests_testing_proto_goTypes = []any{
 	(*SingleRepeated)(nil),                    // 0: sf.substreams.sink.files.testing.SingleRepeated
 	(*MultipleRepeated)(nil),                  // 1: sf.substreams.sink.files.testing.MultipleRepeated
@@ -1314,8 +1382,9 @@ var file_tests_testing_proto_goTypes = []any{
 	(*RowColumnCompressionZstd)(nil),          // 13: sf.substreams.sink.files.testing.RowColumnCompressionZstd
 	(*RowColumnRepeatedString)(nil),           // 14: sf.substreams.sink.files.testing.RowColumnRepeatedString
 	(*RowColumnSandwichedRepeatedString)(nil), // 15: sf.substreams.sink.files.testing.RowColumnSandwichedRepeatedString
-	(*IgnoredRow)(nil),                        // 16: sf.substreams.sink.files.testing.IgnoredRow
-	(*timestamppb.Timestamp)(nil),             // 17: google.protobuf.Timestamp
+	(*RowColumnSandwichedOptional)(nil),       // 16: sf.substreams.sink.files.testing.RowColumnSandwichedOptional
+	(*IgnoredRow)(nil),                        // 17: sf.substreams.sink.files.testing.IgnoredRow
+	(*timestamppb.Timestamp)(nil),             // 18: google.protobuf.Timestamp
 }
 var file_tests_testing_proto_depIdxs = []int32{
 	9,  // 0: sf.substreams.sink.files.testing.SingleRepeated.elements:type_name -> sf.substreams.sink.files.testing.Row
@@ -1325,13 +1394,13 @@ var file_tests_testing_proto_depIdxs = []int32{
 	10, // 4: sf.substreams.sink.files.testing.FromTablesFlat.row:type_name -> sf.substreams.sink.files.testing.RowT
 	10, // 5: sf.substreams.sink.files.testing.FromTablesRepeated.elements:type_name -> sf.substreams.sink.files.testing.RowT
 	10, // 6: sf.substreams.sink.files.testing.FromTablesRepeatedWithIgnore.elements:type_name -> sf.substreams.sink.files.testing.RowT
-	16, // 7: sf.substreams.sink.files.testing.FromTablesRepeatedWithIgnore.ignored:type_name -> sf.substreams.sink.files.testing.IgnoredRow
+	17, // 7: sf.substreams.sink.files.testing.FromTablesRepeatedWithIgnore.ignored:type_name -> sf.substreams.sink.files.testing.IgnoredRow
 	7,  // 8: sf.substreams.sink.files.testing.FromTablesNestedFlat.nested:type_name -> sf.substreams.sink.files.testing.NestedFlat
 	8,  // 9: sf.substreams.sink.files.testing.FromTablesNestedRepeated.nested:type_name -> sf.substreams.sink.files.testing.NestedRepeated
 	10, // 10: sf.substreams.sink.files.testing.NestedFlat.row:type_name -> sf.substreams.sink.files.testing.RowT
 	10, // 11: sf.substreams.sink.files.testing.NestedRepeated.elements:type_name -> sf.substreams.sink.files.testing.RowT
-	17, // 12: sf.substreams.sink.files.testing.Row.typeTimestamp:type_name -> google.protobuf.Timestamp
-	17, // 13: sf.substreams.sink.files.testing.RowT.typeTimestamp:type_name -> google.protobuf.Timestamp
+	18, // 12: sf.substreams.sink.files.testing.Row.typeTimestamp:type_name -> google.protobuf.Timestamp
+	18, // 13: sf.substreams.sink.files.testing.RowT.typeTimestamp:type_name -> google.protobuf.Timestamp
 	14, // [14:14] is the sub-list for method output_type
 	14, // [14:14] is the sub-list for method input_type
 	14, // [14:14] is the sub-list for extension type_name
@@ -1344,13 +1413,14 @@ func file_tests_testing_proto_init() {
 	if File_tests_testing_proto != nil {
 		return
 	}
+	file_tests_testing_proto_msgTypes[16].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_tests_testing_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

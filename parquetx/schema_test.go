@@ -34,6 +34,17 @@ func TestSchemaFromMessageDescriptor(t *testing.T) {
                 }
 			`),
 		},
+		{
+			"sandwiched optional field",
+			(&pbtesting.RowColumnSandwichedOptional{}).ProtoReflect().Descriptor(),
+			schemaLiteral(`
+                message rows {
+                  required binary prefix (STRING);
+                  optional binary value (STRING);
+                  required binary suffix (STRING);
+                }
+			`),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

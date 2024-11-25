@@ -193,6 +193,8 @@ func protoFieldToParquetNode(field protoreflect.FieldDescriptor, columnDef *pbpa
 			}
 
 			out = parquet.Repeated(out)
+		} else if field.HasOptionalKeyword() {
+			out = parquet.Optional(out)
 		}
 	}()
 

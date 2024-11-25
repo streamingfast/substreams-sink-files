@@ -268,6 +268,30 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 			continue
 		}
 
+		// Optional field behaves differently, around the definition level, when the field is actually
+		// set or not present at all than a regular required field. If a field is optional, is definition level
+		// is 1 when the field is present, and 0 when it's not (true only for non-nested fields, nested fields
+		// can go higher than 1).
+		//
+		// Failing to adjust the definition level correctly when the field is optional but present leads to
+		// the data not being populated correctly.
+		if field.HasOptionalKeyword() {
+			var columnValue parquet.Value
+			if !message.Has(field) {
+				columnValue = parquet.NullValue().Level(0, 0, columnIndex)
+			} else {
+				leafValue, err := protoLeafToValue(field, value)
+				if err != nil {
+					return nil, fmt.Errorf("converting leaf field %s: %w", field.FullName(), err)
+				}
+
+				columnValue = leafValue.Level(0, 1, columnIndex)
+			}
+
+			addColumn(columnValue)
+			continue
+		}
+
 		leafValue, err := protoLeafToValue(field, value)
 		if err != nil {
 			return nil, fmt.Errorf("converting leaf field %s: %w", field.FullName(), err)
