@@ -39,7 +39,7 @@ func NewFileSinker(sinker *sink.Sinker, bundler *bundler.Bundler, encoder encode
 func (fs *FileSinker) Run(ctx context.Context) error {
 	cursor, err := fs.bundler.GetCursor()
 	if err != nil {
-		return fmt.Errorf("faile to read cursor: %w", err)
+		return fmt.Errorf("failed to read cursor: %w", err)
 	}
 
 	fs.Sinker.OnTerminating(fs.Shutdown)

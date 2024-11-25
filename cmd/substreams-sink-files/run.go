@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,9 +13,7 @@ import (
 	"github.com/streamingfast/cli"
 	. "github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/derr"
 	"github.com/streamingfast/dstore"
-	"github.com/streamingfast/shutter"
 	sink "github.com/streamingfast/substreams-sink"
 	substreamsfile "github.com/streamingfast/substreams-sink-files"
 	"github.com/streamingfast/substreams-sink-files/bundler"
@@ -114,12 +111,7 @@ var SyncRunCmd = Command(syncRunE,
 )
 
 func syncRunE(cmd *cobra.Command, args []string) error {
-	app := shutter.New()
-
-	ctx, cancelApp := context.WithCancel(cmd.Context())
-	app.OnTerminating(func(_ error) {
-		cancelApp()
-	})
+	app := cli.NewApplication(cmd.Context())
 
 	sink.RegisterMetrics()
 
@@ -225,34 +217,14 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("new bundler: %w", err)
 	}
 
-	fileSinker := substreamsfile.NewFileSinker(sinker, bundler, sinkEncoder, zlog, tracer)
-	fileSinker.OnTerminating(app.Shutdown)
-	app.OnTerminating(func(err error) {
-		zlog.Info("application terminating shutting down file sinker")
-		fileSinker.Shutdown(err)
-	})
+	app.SuperviseAndStart(substreamsfile.NewFileSinker(sinker, bundler, sinkEncoder, zlog, tracer))
 
-	go func() {
-		fileSinker.Shutdown(fileSinker.Run(ctx))
-	}()
-
-	signalHandler := derr.SetupSignalHandler(0 * time.Second)
-	zlog.Info("ready, waiting for signal to quit")
-	select {
-	case <-signalHandler:
-		zlog.Info("received termination signal, quitting application")
-		go app.Shutdown(nil)
-	case <-app.Terminating():
-		NoError(app.Err(), "application shutdown unexpectedly, quitting")
+	if err := app.WaitForTermination(zlog, 0*time.Second, 30*time.Second); err != nil {
+		zlog.Info("app termination error", zap.Error(err))
+		return err
 	}
 
-	zlog.Info("waiting for app termination")
-	select {
-	case <-app.Terminated():
-	case <-ctx.Done():
-	case <-time.After(30 * time.Second):
-		zlog.Error("application did not terminated within 30s, forcing exit")
-	}
+	zlog.Info("app terminated")
 	return nil
 }
 
