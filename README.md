@@ -11,7 +11,7 @@ The sink supports different Substreams output module's type, here a jump list of
 
 - [Line-based CSV](#jsonl-csv-and-any-other-line-based-format)
 - [Line-based JSONL](#jsonl-csv-and-any-other-line-based-format)
-- [Arbitrary Protobuf to JSON]
+- [Arbitrary Protobuf to JSONL](#arbitrary-protobuf-to-jsonl-protojsonjq-like-expression-encoder)
 - Parquet
 
 ### JSONL, CSV and any other line based format
@@ -27,8 +27,8 @@ The [Substreams Ethereum Token Transfers example](https://github.com/streamingfa
 substreams-sink-files run mainnet.eth.streamingfast.io:443 \
     https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg \
     jsonl_out \
-    ./localdata/out \
-    10_000_000:+100_000 \
+    ./out \
+    10_000_000:+20_000 \
     --encoder=lines \
     --file-block-count=10000
 ```
@@ -36,25 +36,75 @@ substreams-sink-files run mainnet.eth.streamingfast.io:443 \
 This will run the Substreams, processes 100 000 blocks and at each bundle of 10 000 blocks, will produce a file containing the lines output by the module, resulting in the files on disk:
 
 ```bash
-./localdata/out
+./out
 ├── 0010000000-0010010000.jsonl
-├── 0010010000-0010020000.jsonl
-├── 0010020000-0010030000.jsonl
-├── 0010030000-0010040000.jsonl
-├── 0010040000-0010050000.jsonl
-├── 0010050000-0010060000.jsonl
-├── 0010060000-0010070000.jsonl
-├── 0010070000-0010080000.jsonl
-├── 0010080000-0010090000.jsonl
-└── 0010090000-0010100000.jsonl
+└── 0010010000-0010020000.jsonl
 ```
 
 With example of file content:
 
 ```json
-$ cat localdata/out/0010000000-0010010000.jsonl| head -n1
+$ cat out/0010000000-0010010000.jsonl | head -n1
 {"schema":"erc20","trx_hash":"1f17943d5dd7053959f1dc092dfad60a7caa084224212b1adbecaf3137efdfdd","log_index":0,"from":"876eabf441b2ee5b5b0554fd502a8e0600950cfa","to":"566021352eb2f882538bf8d59e5d2ba741b9ec7a","quantity":"95073600000000000000","operator":"","token_id":""}
 ```
+
+### Arbitrary Protobuf to JSONL (`protojson:<jq like expression>` encoder)
+
+When using 'protojson:<jq like expression>', the output module must be a Protobuf message of any kind. The encoder will extract
+rows by using the `jq like expression` to retrieve rows from a repeated field on the message and will write the data
+to a JSONL file, one element retrieved per row.
+
+> [!NOTE]
+> The JSON output format used is the Protobuf JSON output format from https://protobuf.dev/programming-guides/json/ and
+> we specifically the Golang [protojson](https://pkg.go.dev/google.golang.org/protobuf/encoding/protojson) package to achieve
+> that.
+
+The `jq like expression` that will be used to extract rows from the Protobuf message only supports a single query form
+today and it's `.<repeated_field_name>[]`. For example, if your output module is a Protobuf message:
+
+```proto
+message Output {
+    repeated Entity entities = 1;
+}
+
+message Entity {
+    ...
+}
+```
+
+Running the sink with the `--encoder="protojson:.entities[]"`:
+
+```bash
+substreams-sink-files run mainnet.eth.streamingfast.io:443 \
+    https://github.com/streamingfast/substreams-eth-token-transfers/releases/download/v0.4.0/substreams-eth-token-transfers-v0.4.0.spkg \
+    map_transfers \
+    ./out \
+    10_000_000:+20_000 \
+    --encoder="protojson:.transfers[]" \
+    --file-block-count=10000
+```
+
+This will run the Substreams, processes 100 000 blocks and at each bundle of 10 000 blocks,
+
+Would yield all entity from the `entities` list as individual rows in the
+JSONL file:
+
+ will produce a file containing the lines output by the module, resulting in the files on disk:
+
+```bash
+./out
+├── 0010000000-0010010000.jsonl
+└── 0010010000-0010020000.jsonl
+```
+
+With example of file content:
+
+```json
+$ cat out/0010000000-0010010000.jsonl | head -n1
+{"schema":"erc20","trxHash":"1f17943d5dd7053959f1dc092dfad60a7caa084224212b1adbecaf3137efdfdd","from":"876eabf441b2ee5b5b0554fd502a8e0600950cfa","to":"566021352eb2f882538bf8d59e5d2ba741b9ec7a","quantity":"95073600000000000000"}
+```
+
+This mode is a little bit less performant that the 'lines' encoder, as the JSON encoding is done on the fly, but is more generic and can adapt to more Substreams.
 
 ## Documentation
 

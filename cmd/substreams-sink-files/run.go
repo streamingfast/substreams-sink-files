@@ -30,7 +30,7 @@ import (
 )
 
 var SyncRunCmd = Command(syncRunE,
-	"run <endpoint> <manifest> <module> <output_store> [<start>:<stop>]",
+	"run <manifest> <module> <output_store> [<start>:<stop>]",
 	"Runs extractor code",
 	RangeArgs(4, 5),
 	Flags(func(flags *pflag.FlagSet) {
@@ -39,8 +39,62 @@ var SyncRunCmd = Command(syncRunE,
 		flags.String("file-working-dir", "./localdata/working", "Working store where we accumulate data")
 		flags.String("state-store", "./state.yaml", "Output path where to store latest received cursor, if empty, cursor will not be persisted")
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
-		flags.String("encoder", "", "Sets which encoder to use to parse the Substreams Output Module data. Options are: 'lines', 'parquet', 'proto:<_proto_path_to_field>'")
-		flags.Uint64("buffer-max-size", 64*1024*1024, FlagDescription(`
+		flags.String("encoder", "parquet", FlagMultiLineDescription(`
+			Sets which encoder to use to parse the Substreams Output Module data. Options are: 'parquet', 'lines', 'protojson:<jq like expression>'
+
+			## Parquet
+
+			When using 'parquet', the output module must be a protobuf message, and the encoder will write the data to a parquet file.
+			Refer to project readme at https://github.com/streamingfast/substreams-sink-files/blob/master/README.md for details
+			about how Parquet encoder works to transform Protobuf messages into Parquet "rows/columns".
+
+			## Lines
+
+			When using 'lines', the output module must be a 'sf.substreams.sink.files.v1.Lines', which is essentially a list of strings,
+			each strings being a line of text. This works well for a variety of line based format like JSONL, CSV, Accounting formats,
+			TSC, etc.
+
+			See https://github.com/streamingfast/substreams-sink-files/blob/master/proto/sf/substreams/sink/files/v1/files.proto#L13-L26
+			for the Protobuf definition of the 'Lines' message.
+
+			## 'protojson:<jq like expression>'
+
+			When using 'protojson:<jq like expression>', the output module must be a Protobuf message, and the encoder will write the data
+			to a JSONL file by extracting each rows using the jq like expression.
+
+			**Note**
+			The JSON output format used is the Protobuf JSON output format from https://protobuf.dev/programming-guides/json/ and
+			we specifically the Golang [protojson](https://pkg.go.dev/google.golang.org/protobuf/encoding/protojson) package to achieve that
+
+			The <jq like expression> that will be used to extract rows from the Protobuf message only supports a single expression form
+			which is '.<repeated_field_name>[]'. For example, if the output module is a Protobuf message:
+
+			  message Output {
+			    repeated Entity entities = 1;
+			  }
+
+			  message Entity {
+			    ...
+			  }
+
+			The expression '.entities[]' would yield all entity from the list as individual rows in the JSONL file. So with an Output
+			module message like this:
+
+			  {
+			    "entities": [
+					{id: 1, name: "one"}
+					{id: 2, name: "two"}
+				]
+			  }
+
+			You would get the following JSONL file:
+
+			  {"id": 1, "name": "one"}
+			  {"id": 2, "name": "two"}
+
+			This mode is a little bit less performant that the 'lines' encoder, as the JSON encoding is done on the fly.
+		`))
+		flags.Uint64("buffer-max-size", 64*1024*1024, FlagMultiLineDescription(`
 			Amount of memory bytes to allocate to the buffered writer. If your data set is small enough that every is hold in memory, we are going to avoid
 			the local I/O operation(s) and upload accumulated content in memory directly to final storage location.
 
@@ -131,7 +185,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	var sinkEncoder encoder.Encoder
 
 	switch {
-	case encoderType == "lines" || strings.HasPrefix(encoderType, "proto:"):
+	case encoderType == "lines" || strings.HasPrefix(encoderType, "proto:") || strings.HasPrefix(encoderType, "protojson:"):
 		boundaryWriter = writer.NewBufferedIO(bufferMaxSize, fileWorkingDir, writer.FileTypeJSONL, zlog)
 		sinkEncoder, err = getEncoder(encoderType, sinker)
 		if err != nil {
@@ -207,13 +261,16 @@ func getEncoder(encoderType string, sinker *sink.Sinker) (encoder.Encoder, error
 		return encoder.NewLineEncoder(), nil
 	}
 
-	if strings.HasPrefix(encoderType, "proto:") {
+	sanitizedEncoderType := strings.TrimPrefix(strings.TrimPrefix(encoderType, "protojson:"), "proto:")
+	hadProtojsonPrefix := len(encoderType) != len(sanitizedEncoderType)
+
+	if hadProtojsonPrefix {
 		msgDesc, err := outputMessageDescriptor(sinker)
 		if err != nil {
 			return nil, fmt.Errorf("output message descriptor: %w", err)
 		}
 
-		return encoder.NewProtoToJson(strings.Replace(encoderType, "proto:", "", 1), msgDesc)
+		return encoder.NewProtoToJson(sanitizedEncoderType, msgDesc)
 	}
 
 	return nil, fmt.Errorf("unknown encoder type %q", encoderType)
@@ -250,4 +307,8 @@ func outputProtoreflectMessageDescriptor(sinker *sink.Sinker) (protoreflect.Mess
 	}
 
 	return value, nil
+}
+
+func FlagMultiLineDescription(in string) string {
+	return string(Description(in))
 }
