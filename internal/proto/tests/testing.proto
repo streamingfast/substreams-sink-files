@@ -122,6 +122,14 @@ message RowColumnRepeatedString {
     repeated string values = 1;
 }
 
+message RowColumnSandwichedRepeatedString {
+    option (parquet.table_name) = "rows";
+
+    string prefix = 1;
+    repeated string values = 2;
+    string suffix = 3;
+}
+
 message IgnoredRow {
     string id = 1;
 }

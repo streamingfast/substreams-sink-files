@@ -288,6 +288,32 @@ func TestParquetWriter(t *testing.T) {
 
 	runCases(t, []parquetWriterCase[GoRowColumnRepeatedString]{
 		{
+			name: "protobuf table with column empty/nil repeated string",
+			// Not sure why, but ch-db complains with 'Array does not start with '[' character: while converting 'abc-0' to Array(Nullable(String))'
+			onlyDrivers: []string{"parquet-go"},
+			outputModules: []proto.Message{
+				&pbtesting.RowColumnRepeatedString{
+					Values: nil,
+				},
+				&pbtesting.RowColumnRepeatedString{
+					Values: []string{},
+				},
+			},
+			expectedRows: map[string][]GoRowColumnRepeatedString{
+				"rows": {
+					GoRowColumnRepeatedString{
+						// parquet-go seems to always return an empty array for `nil` in entry
+						// it's possible https://github.com/parquet-go/parquet-go/pull/95 would
+						// fix this.
+						Values: []string{},
+					},
+					GoRowColumnRepeatedString{
+						Values: []string{},
+					},
+				},
+			},
+		},
+		{
 			name: "protobuf table with column repeated string",
 			// Not sure why, but ch-db complains with 'Array does not start with '[' character: while converting 'abc-0' to Array(Nullable(String))'
 			onlyDrivers: []string{"parquet-go"},
@@ -299,6 +325,49 @@ func TestParquetWriter(t *testing.T) {
 			expectedRows: map[string][]GoRowColumnRepeatedString{
 				"rows": {
 					GoRowColumnRepeatedString{Values: []string{"abc-0", "abc-1"}},
+				},
+			},
+		},
+	})
+
+	type GoRowColumnSandwichedRepeatedString struct {
+		Prefix string   `parquet:"prefix" db:"prefix"`
+		Values []string `parquet:"values" db:"values"`
+		Suffix string   `parquet:"suffix" db:"suffix"`
+	}
+
+	runCases(t, []parquetWriterCase[GoRowColumnSandwichedRepeatedString]{
+		{
+			name: "protobuf table with sandwiched column empty/nil repeated string",
+			// Not sure why, but ch-db complains with 'Array does not start with '[' character: while converting 'abc-0' to Array(Nullable(String))'
+			onlyDrivers: []string{"parquet-go"},
+			outputModules: []proto.Message{
+				&pbtesting.RowColumnSandwichedRepeatedString{
+					Prefix: "prefix-0",
+					Values: nil,
+					Suffix: "suffix-0",
+				},
+				&pbtesting.RowColumnSandwichedRepeatedString{
+					Prefix: "prefix-1",
+					Values: []string{},
+					Suffix: "suffix-1",
+				},
+			},
+			expectedRows: map[string][]GoRowColumnSandwichedRepeatedString{
+				"rows": {
+					GoRowColumnSandwichedRepeatedString{
+						Prefix: "prefix-0",
+						// parquet-go seems to always return an empty array for `nil` in entry
+						// it's possible https://github.com/parquet-go/parquet-go/pull/95 would
+						// fix this.
+						Values: []string{},
+						Suffix: "suffix-0",
+					},
+					GoRowColumnSandwichedRepeatedString{
+						Prefix: "prefix-1",
+						Values: []string{},
+						Suffix: "suffix-1",
+					},
 				},
 			},
 		},

@@ -191,7 +191,23 @@ func ProtoRowExtractorFromRepeatedFields(fieldByTableName map[string]protoreflec
 	})
 }
 
+// ProtoMessageToRow converts a protobuf message to a parquet row, handling repeated single level fields
+// for now.
+//
+// At term, this will handle nested messages and repeated fields of any depth.
 func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
+	// To better understand how we turn a protobuf message into a parquet.Row which
+	// is a slice of parquet.Value, you will need to understand the Dremel encoding
+	// used by Parquet to store repeated and nested group into a flat columnar format.
+	//
+	// The Dremel encoding is based on the concept of repetition and definition levels.
+	// The repetition level is the number of repeated fields between the current field
+	// and the root of the repeated field. The definition level is the number of optional
+	// fields between the current field and the root of the optional field.
+	//
+	// See https://blog.x.com/engineering/en_us/a/2013/dremel-made-simple-with-parquet
+	// for more information about the Dremel encoding.
+
 	messageDesc := message.Descriptor()
 	fields := messageDesc.Fields()
 
@@ -226,22 +242,29 @@ func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 
 		if field.IsList() {
 			fieldList := value.List()
-			sliceValues := make([]parquet.Value, fieldList.Len())
-			for i := 0; i < fieldList.Len(); i++ {
-				sliceValue, err := protoLeafToValue(field, fieldList.Get(i))
-				if err != nil {
-					return nil, fmt.Errorf("converting leaf field %s @ index %d: %w", field.FullName(), i, err)
+			if fieldList.Len() == 0 {
+				addColumn(parquet.NullValue().Level(0, 0, columnIndex))
+			} else {
+				sliceValues := make([]parquet.Value, fieldList.Len())
+				for i := 0; i < fieldList.Len(); i++ {
+					sliceValue, err := protoLeafToValue(field, fieldList.Get(i))
+					if err != nil {
+						return nil, fmt.Errorf("converting leaf field %s @ index %d: %w", field.FullName(), i, err)
+					}
+
+					repetitionLevel := i
+					if repetitionLevel != 0 {
+						repetitionLevel = 1
+					}
+
+					// FIXME: Handle nested repeated fields here where definition level would be
+					// something else than 1.
+					sliceValues[i] = sliceValue.Level(repetitionLevel, 1, columnIndex)
 				}
 
-				repetitionLevel := i
-				if repetitionLevel != 0 {
-					repetitionLevel = 1
-				}
-
-				sliceValues[i] = sliceValue.Level(repetitionLevel, 1, columnIndex)
+				addColumn(sliceValues...)
 			}
 
-			addColumn(sliceValues...)
 			continue
 		}
 
