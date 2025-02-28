@@ -7,19 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Next
 
-* The `substreams-sink-files run` has been overhaul to conform with `substreams run/gui` specifications around flags and arguments.
-
-    **Before**:
-
-    ```bash
-    substreams-sink-files run --encoder="parquet" <endpoint> <file.spkg> <module> <output-path> [<block-range>]
-    ```
-
-    **After**:
-
-    ```bash
-    substreams-sink-files run --encoder="parquet" <file.spkg> [<manifest> [<module_name>] [<block-range>]] --output-path=<output-path> --network=<network>
-    ```
+* Added initial nested message and repeated nested message for Parquet sink (in beta).
 
 * The `--encoder="proto:<jq like expression>"` is deprecated, replaced with `--encoder="protojson:<jq like expression>"` (the accepted `jq` expression is very limited, see [README](./README.md) for details).
 

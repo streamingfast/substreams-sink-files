@@ -188,8 +188,8 @@ func protoFieldToParquetNode(field protoreflect.FieldDescriptor, columnDef *pbpa
 	defer func() {
 		if field.IsList() {
 			fieldKind := field.Kind()
-			if fieldKind == protoreflect.MessageKind || fieldKind == protoreflect.GroupKind {
-				panic(fmt.Errorf("repeated field %s is of kind protoreflect.MessageKind or protoreflect.GroupKind which is not supported for list type yet", field.FullName()))
+			if fieldKind == protoreflect.GroupKind {
+				panic(fmt.Errorf("repeated field %s is of kind protoreflect.GroupKind which is not supported for list type yet", field.FullName()))
 			}
 
 			out = parquet.Repeated(out)
@@ -225,7 +225,11 @@ func protoFieldToParquetNode(field protoreflect.FieldDescriptor, columnDef *pbpa
 			return parquet.Timestamp(parquet.Nanosecond)
 		}
 
-		panic(fmt.Errorf("field %s is of kind protoreflect.MessageKind which is not supported yet", field.FullName()))
+		if protox.IsWellKnownGoogleField(field) {
+			panic(fmt.Errorf("field %s is a well-known google type which is not supported yet", field.FullName()))
+		}
+
+		return newMessageNode(field.Message(), nil)
 	case protoreflect.GroupKind:
 		panic(fmt.Errorf("field %s is of kind protoreflect.GroupKind which is not supported yet", field.FullName()))
 
