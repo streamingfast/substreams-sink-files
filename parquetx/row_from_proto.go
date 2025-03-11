@@ -256,6 +256,16 @@ func protoLeafToValue(field protoreflect.FieldDescriptor, value protoreflect.Val
 		if protox.IsWellKnownTimestampField(field) {
 			return parquet.Int64Value(protox.DynamicAsTimestampTime(value.Message()).UnixNano()), nil
 		}
+	case protoreflect.EnumKind:
+		enumField := field.Enum()
+		enumNumber := value.Enum()
+
+		if enumNumber < 0 || int(enumNumber) >= enumField.Values().Len() {
+			return out, fmt.Errorf("enum value %d is not a valid enumeration value for field '%s', known enum values are [%s]", enumNumber, field.Name(), protox.EnumKnownValuesDebugString(enumField))
+		}
+
+		valueDescriptor := enumField.Values().ByNumber(enumNumber)
+		return parquet.ByteArrayValue([]byte(protox.EnumValueToString(valueDescriptor))), nil
 	}
 
 	return out, fmt.Errorf("type %s isn't supported yet as a leaf node", field.Kind())

@@ -168,3 +168,15 @@ message Repeated {
 message IgnoredRow {
     string id = 1;
 }
+
+message RowColumEnum {
+    option (parquet.table_name) = "rows";
+
+    enum Value {
+        UNKNOWN = 0;
+        FIRST = 1;
+        SECOND = 2;
+    }
+
+    Value value = 1;
+}

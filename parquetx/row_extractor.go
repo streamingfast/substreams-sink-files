@@ -129,7 +129,7 @@ func ProtoRowExtractorFromTables(tables []TableResult) ProtoRowExtractor {
 		if schema, found := tablesByMessage[rootDescriptor.FullName()]; found {
 			row, err := ProtoMessageToRow(root)
 			if err != nil {
-				return nil, fmt.Errorf("converting message %q to row: %w", rootDescriptor.FullName(), err)
+				return nil, fmt.Errorf("converting message row: %w", err)
 			}
 
 			out[schema.Name()] = append(out[schema.Name()], row)

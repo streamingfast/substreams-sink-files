@@ -1,6 +1,4 @@
-# syntax=docker/dockerfile:1.2
-
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get -y install \
