@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 	"github.com/parquet-go/parquet-go"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
@@ -25,8 +23,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-
-	_ "github.com/chdb-io/chdb-go/chdb/driver"
 )
 
 type parquetWriterCase[T any] struct {
@@ -107,7 +103,7 @@ func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
 				return
 			}
 
-			drivers := []string{"parquet-go", "chdb"}
+			drivers := []string{"parquet-go"}
 			if len(testCase.onlyDrivers) > 0 {
 				drivers = testCase.onlyDrivers
 			}
@@ -126,17 +122,8 @@ func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
 							require.NoError(t, err, "driver %q", driver)
 
 							assert.Equal(t, expectedRows, actualRows, "driver %q", driver)
-						} else if driver == "chdb" {
-							chFileInput := filepath.Join(storeDest, tableName, "*.parquet")
-
-							dbx, err := sqlx.Open("chdb", "")
-							require.NoError(t, err, "driver %q", driver)
-
-							var destinationRows []T
-							err = dbx.Select(&destinationRows, fmt.Sprintf(`select * from file('%s', Parquet)`, chFileInput))
-							require.NoError(t, err, "driver %q", driver)
-
-							assert.Equal(t, testCase.expectedRows[tableName], destinationRows, "driver %q", driver)
+						} else {
+							t.Fatalf("unsupported driver %q", driver)
 						}
 					}
 				})

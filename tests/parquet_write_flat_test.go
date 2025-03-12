@@ -6,8 +6,6 @@ import (
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	pbtesting "github.com/streamingfast/substreams-sink-files/internal/pb/tests"
 	"google.golang.org/protobuf/proto"
-
-	_ "github.com/chdb-io/chdb-go/chdb/driver"
 )
 
 func testParquetWriteFlatCases(t *testing.T) {

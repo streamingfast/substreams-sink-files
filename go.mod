@@ -6,17 +6,14 @@ toolchain go1.22.7
 
 require (
 	github.com/bobg/go-generics/v2 v2.2.2
-	github.com/chdb-io/chdb-go v1.7.1
 	github.com/holiman/uint256 v1.3.1
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jhump/protoreflect v1.14.0
-	github.com/jmoiron/sqlx v1.4.0
 	github.com/parquet-go/parquet-go v0.23.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/streamingfast/bstream v0.0.2-0.20240916154503-c9c5c8bbeca0
 	github.com/streamingfast/cli v0.0.4-0.20241119021815-815afa473375
-	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1
 	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2
 	github.com/streamingfast/dmetrics v0.0.0-20240214191810-524a5c58fbaa
 	github.com/streamingfast/dstore v0.1.1-0.20241011152904-9acd6205dc14
@@ -36,7 +33,6 @@ require (
 	github.com/RoaringBitmap/roaring v1.9.1 // indirect
 	github.com/alecthomas/participle v0.7.1 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
-	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.12.0 // indirect
 	github.com/bobg/go-generics/v3 v3.4.0 // indirect
@@ -44,15 +40,11 @@ require (
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
 	github.com/charmbracelet/x/ansi v0.4.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/goccy/go-json v0.10.3 // indirect
-	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/google/s2a-go v0.1.7 // indirect
-	github.com/huandu/go-sqlbuilder v1.27.3 // indirect
-	github.com/huandu/xstrings v1.4.0 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.8 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
@@ -62,13 +54,12 @@ require (
 	github.com/schollz/closestmatch v2.1.0+incompatible // indirect
 	github.com/segmentio/encoding v0.4.0 // indirect
 	github.com/spf13/viper v1.15.0 // indirect
-	github.com/zeebo/xxh3 v1.0.2 // indirect
+	github.com/streamingfast/derr v0.0.0-20230515163924-8570aaa43fe1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	golang.org/x/tools v0.23.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240716161551-93cc26a95ae9 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect

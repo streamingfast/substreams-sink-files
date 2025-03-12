@@ -3,7 +3,6 @@ package tests
 import (
 	"testing"
 
-	_ "github.com/chdb-io/chdb-go/chdb/driver"
 	pbtesting "github.com/streamingfast/substreams-sink-files/internal/pb/tests"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
