@@ -260,11 +260,10 @@ func protoLeafToValue(field protoreflect.FieldDescriptor, value protoreflect.Val
 		enumField := field.Enum()
 		enumNumber := value.Enum()
 
-		if enumNumber < 0 || int(enumNumber) >= enumField.Values().Len() {
+		valueDescriptor := enumField.Values().ByNumber(enumNumber)
+		if valueDescriptor == nil {
 			return out, fmt.Errorf("enum value %d is not a valid enumeration value for field '%s', known enum values are [%s]", enumNumber, field.Name(), protox.EnumKnownValuesDebugString(enumField))
 		}
-
-		valueDescriptor := enumField.Values().ByNumber(enumNumber)
 		return parquet.ByteArrayValue([]byte(protox.EnumValueToString(valueDescriptor))), nil
 	}
 

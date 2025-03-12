@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package sf.substreams.sink.files.testing;
+
+import "parquet/options.proto";
+
+option go_package = "github.com/streamingfast/substreams-sink-files/internal/pb/testing;pbtesting";
+
+enum EnumValue {
+    UNKNOWN = 0;
+    FIRST = 1;
+    SECOND = 2;
+}
+
+message RowColumEnum {
+    option (parquet.table_name) = "rows";
+
+    EnumValue value = 1;
+}
+
+message RowColumEnumInside {
+    option (parquet.table_name) = "rows";
+
+    enum Value {
+        UNKNOWN = 0;
+        FIRST = 1;
+        SECOND = 2;
+    }
+
+    Value value = 1;
+}
+
+message RowColumEnumWithSkippedValue {
+    option (parquet.table_name) = "rows";
+
+    enum Value {
+        UNKNOWN = 0;
+        SECOND = 2;
+    }
+
+    Value value = 1;
+}
+
+

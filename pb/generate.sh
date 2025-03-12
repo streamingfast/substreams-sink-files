@@ -36,7 +36,9 @@ function main() {
   fi
 
   pushd "$ROOT/internal"
-  protoc -I=./proto -I=../proto --go_out=paths=source_relative:./pb tests/testing.proto
+
+  proto_files=$(cd proto && find tests -name "*.proto")
+  protoc -I=./proto -I=../proto --go_out=paths=source_relative:./pb $proto_files
 
   echo "Done"
 }

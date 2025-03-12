@@ -1,11 +1,5 @@
 syntax = "proto3";
 
-// The `sf.substreams.sink.files.v1` package can be use in your Substreams to defined a `map` module
-// whose output type will be one of the message defined in the package. The `substreams-sink-files`
-// binary will then consume your module's output to create the files containing your extracted data.
-//
-// The current package supports a single output format which is the `Lines` message which represents
-// a list of plain-text "line" that should be appended together in a single bundle.
 package sf.substreams.sink.files.testing;
 
 import "google/protobuf/timestamp.proto";
@@ -138,45 +132,6 @@ message RowColumnSandwichedOptional {
     string suffix = 3;
 }
 
-
-message RowColumnNestedMessage {
-    option (parquet.table_name) = "rows";
-
-    Nested nested = 1;
-}
-
-message RowColumnRepeatedNestedMessage {
-    option (parquet.table_name) = "rows";
-
-    repeated Nested nested = 1;
-}
-
-message RowColumnNestedRepeatedMessage {
-    option (parquet.table_name) = "rows";
-
-    Repeated nested = 1;
-}
-
-message Nested {
-    string value = 1;
-}
-
-message Repeated {
-    repeated string value = 1;
-}
-
 message IgnoredRow {
     string id = 1;
-}
-
-message RowColumEnum {
-    option (parquet.table_name) = "rows";
-
-    enum Value {
-        UNKNOWN = 0;
-        FIRST = 1;
-        SECOND = 2;
-    }
-
-    Value value = 1;
 }

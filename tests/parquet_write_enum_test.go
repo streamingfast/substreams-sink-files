@@ -20,7 +20,24 @@ func testParquetWriteEnumCases(t *testing.T) {
 			onlyDrivers: []string{"parquet-go"},
 			outputModules: []proto.Message{
 				&pbtesting.RowColumEnum{
-					Value: pbtesting.RowColumEnum_SECOND,
+					Value: pbtesting.EnumValue_FIRST,
+				},
+			},
+			expectedRows: map[string][]GoEnum{
+				"rows": {
+					GoEnum{
+						Value: "FIRST",
+					},
+				},
+			},
+		},
+
+		{
+			name:        "protobuf table with enum field, enum defined inside message",
+			onlyDrivers: []string{"parquet-go"},
+			outputModules: []proto.Message{
+				&pbtesting.RowColumEnumInside{
+					Value: pbtesting.RowColumEnumInside_SECOND,
 				},
 			},
 			expectedRows: map[string][]GoEnum{
@@ -33,15 +50,28 @@ func testParquetWriteEnumCases(t *testing.T) {
 		},
 
 		{
-			name:        "protobuf table with enum field but value is outside of enum's range",
+			name:        "protobuf table with enum field but value is outside of enum's range, enum defined inside message",
 			onlyDrivers: []string{"parquet-go"},
 			outputModules: []proto.Message{
-				&pbtesting.RowColumEnum{
-					Value: pbtesting.RowColumEnum_Value(5),
+				&pbtesting.RowColumEnumInside{
+					Value: pbtesting.RowColumEnumInside_Value(5),
 				},
 			},
 			expectedError: errorIsString(
-				`extracting rows from message "sf.substreams.sink.files.testing.RowColumEnum": converting message row: root message: leaf to value: enum value 5 is not a valid enumeration value for field 'value', known enum values are [UNKNOWN (0), FIRST (1), SECOND (2)]`,
+				`extracting rows from message "sf.substreams.sink.files.testing.RowColumEnumInside": converting message row: root message: leaf to value: enum value 5 is not a valid enumeration value for field 'value', known enum values are [UNKNOWN (0), FIRST (1), SECOND (2)]`,
+			),
+		},
+
+		{
+			name:        "protobuf table with enum field but value received is unknown, enum defined inside message",
+			onlyDrivers: []string{"parquet-go"},
+			outputModules: []proto.Message{
+				&pbtesting.RowColumEnumWithSkippedValue{
+					Value: pbtesting.RowColumEnumWithSkippedValue_Value(1),
+				},
+			},
+			expectedError: errorIsString(
+				`extracting rows from message "sf.substreams.sink.files.testing.RowColumEnumWithSkippedValue": converting message row: root message: leaf to value: enum value 1 is not a valid enumeration value for field 'value', known enum values are [UNKNOWN (0), SECOND (2)]`,
 			),
 		},
 	})

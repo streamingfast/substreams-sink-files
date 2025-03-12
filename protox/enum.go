@@ -15,7 +15,9 @@ func EnumValueToString(enumValue protoreflect.EnumValueDescriptor) string {
 func EnumKnownValuesDebugString(enum protoreflect.EnumDescriptor) string {
 	values := make([]string, 0, enum.Values().Len())
 	for i := 0; i < enum.Values().Len(); i++ {
-		values = append(values, fmt.Sprintf("%s (%d)", EnumValueToString(enum.Values().Get(i)), i))
+		enumValue := enum.Values().Get(i)
+
+		values = append(values, fmt.Sprintf("%s (%d)", EnumValueToString(enumValue), enumValue.Number()))
 	}
 	return strings.Join(values, ", ")
 }

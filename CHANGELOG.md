@@ -7,19 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Next
 
-The `substreams-sink-files run` has been overhaul to conform with `substreams run/gui` specifications around flags and arguments.
-
-    **Before**:
-
-    ```bash
-    substreams-sink-files run --encoder="parquet" <endpoint> <file.spkg> <module> <output-path> [<block-range>]
-    ```
-
-    **After**:
-
-    ```bash
-    substreams-sink-files run --encoder="parquet" <file.spkg> [<manifest> [<module_name>] [<block-range>]] --output-path=<output-path> [--network=<network>]
-    ```
+* Fixed panic when enum value is unknown, returns a clear error message now.
 
 * Added initial support for enum type for Parquet sink, Parquet schema is `required binary <name> (ENUM)` in those case and the enum's string value is used as the value in the data.
 

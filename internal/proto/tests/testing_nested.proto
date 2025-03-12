@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package sf.substreams.sink.files.testing;
+
+import "parquet/options.proto";
+
+option go_package = "github.com/streamingfast/substreams-sink-files/internal/pb/testing;pbtesting";
+
+
+message RowColumnNestedMessage {
+    option (parquet.table_name) = "rows";
+
+    Nested nested = 1;
+}
+
+message RowColumnRepeatedNestedMessage {
+    option (parquet.table_name) = "rows";
+
+    repeated Nested nested = 1;
+}
+
+message RowColumnNestedRepeatedMessage {
+    option (parquet.table_name) = "rows";
+
+    Repeated nested = 1;
+}
+
+message Nested {
+    string value = 1;
+}
+
+message Repeated {
+    repeated string value = 1;
+}
