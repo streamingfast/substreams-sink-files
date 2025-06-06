@@ -26,22 +26,26 @@ import (
 )
 
 type parquetWriterCase[T any] struct {
-	name          string
-	skip          string
-	onlyDrivers   []string
-	writerOptions []writer.ParquetWriterOption
-	outputModules []proto.Message
-	expectedRows  map[string][]T
-	expectedError require.ErrorAssertionFunc
+	name                   string
+	skip                   string
+	onlyDrivers            []string
+	writerOptions          []writer.ParquetWriterOption
+	outputModules          []proto.Message
+	expectedRows           map[string][]T
+	expectedNewWriterError require.ErrorAssertionFunc
+	expectedEncodeError    require.ErrorAssertionFunc
 }
 
 func TestParquetWriter(t *testing.T) {
 	testParquetWriteFlatCases(t)
 	testParquetWriteEnumCases(t)
 	testParquetWriteNestedCases(t)
+	testParquetWriteCompressionCases(t)
 }
 
 func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
+	t.Helper()
+
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			if testCase.skip != "" {
@@ -65,7 +69,12 @@ func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
 
 			ctx := context.Background()
 			writer, err := writer.NewParquetWriter(descriptor, testLogger, testTracer, testCase.writerOptions...)
-			require.NoError(t, err)
+			if testCase.expectedNewWriterError != nil {
+				testCase.expectedNewWriterError(t, err)
+				return
+			} else {
+				require.NoError(t, err)
+			}
 
 			err = writer.StartBoundary(bstream.NewRangeExcludingEnd(0, 1000))
 			require.NoError(t, err)
@@ -82,8 +91,8 @@ func runCases[T any](t *testing.T, cases []parquetWriterCase[T]) {
 				allErr = multierr.Append(allErr, err)
 			}
 
-			if testCase.expectedError != nil {
-				testCase.expectedError(t, allErr)
+			if testCase.expectedEncodeError != nil {
+				testCase.expectedEncodeError(t, allErr)
 				return
 			} else {
 				require.NoError(t, allErr)

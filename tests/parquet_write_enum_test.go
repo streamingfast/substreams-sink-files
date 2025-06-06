@@ -56,7 +56,7 @@ func testParquetWriteEnumCases(t *testing.T) {
 					Value: pbtesting.RowColumEnumInside_Value(5),
 				},
 			},
-			expectedError: errorIsString(
+			expectedEncodeError: errorIsString(
 				`extracting rows from message "sf.substreams.sink.files.testing.RowColumEnumInside": converting message row: root message: leaf to value: enum value 5 is not a valid enumeration value for field 'value', known enum values are [UNKNOWN (0), FIRST (1), SECOND (2)]`,
 			),
 		},
@@ -69,7 +69,7 @@ func testParquetWriteEnumCases(t *testing.T) {
 					Value: pbtesting.RowColumEnumWithSkippedValue_Value(1),
 				},
 			},
-			expectedError: errorIsString(
+			expectedEncodeError: errorIsString(
 				`extracting rows from message "sf.substreams.sink.files.testing.RowColumEnumWithSkippedValue": converting message row: root message: leaf to value: enum value 1 is not a valid enumeration value for field 'value', known enum values are [UNKNOWN (0), SECOND (2)]`,
 			),
 		},

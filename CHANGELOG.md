@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Next
 
+* Trap panics when Parquet encoder inspects Protobuf for proper error reporting
+
+* Properly shows an error when defining column-level compression on non-leaf types.
+
+* Fixed default compression not working in presence of nested messages.
+
 * Fixed panic when enum value is unknown, returns a clear error message now.
 
 * Added initial support for enum type for Parquet sink, Parquet schema is `required binary <name> (ENUM)` in those case and the enum's string value is used as the value in the data.

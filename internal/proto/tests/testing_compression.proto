@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package sf.substreams.sink.files.testing;
+
+import "parquet/options.proto";
+import "tests/testing_nested.proto";
+
+option go_package = "github.com/streamingfast/substreams-sink-files/internal/pb/testing;pbtesting";
+
+message RowColumnCompressionZstd {
+    string value = 1 [(parquet.column) = {compression: ZSTD}];
+}
+
+message RowNestedCompressionInvalid {
+    option (parquet.table_name) = "rows";
+
+    Nested value = 1 [(parquet.column) = {compression: ZSTD}];
+}

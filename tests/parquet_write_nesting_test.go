@@ -7,11 +7,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func testParquetWriteNestedCases(t *testing.T) {
-	type GoNested struct {
-		Value string `parquet:"value" db:"value"`
-	}
+type GoNested struct {
+	Value string `parquet:"value" db:"value"`
+}
 
+func testParquetWriteNestedCases(t *testing.T) {
 	type GoRowNestedMessage struct {
 		Nested *GoNested `parquet:"nested" db:"nested"`
 	}

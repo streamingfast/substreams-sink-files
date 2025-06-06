@@ -51,7 +51,16 @@ func tableResult(descriptor protoreflect.MessageDescriptor, schema *parquet.Sche
 	}
 }
 
-func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression, logger *zap.Logger, tracer logging.Tracer) (out []TableResult, rowExtractor ProtoRowExtractor) {
+func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, defaultColumnCompression *pbparquet.Compression, logger *zap.Logger, tracer logging.Tracer) (out []TableResult, rowExtractor ProtoRowExtractor, err error) {
+	// We catch any errors that might happen during the walk, so we can return a proper error an not a panic
+	defer func() {
+		if recoveredErr := recover(); recoveredErr != nil {
+			out = nil
+			rowExtractor = nil
+			err = fmt.Errorf("error while walking message descriptor %s: %w", descriptor.FullName(), recoveredAnyToError(recoveredErr))
+		}
+	}()
+
 	protox.WalkMessageDescriptors(descriptor, logger, tracer, func(child protoreflect.MessageDescriptor) {
 		if tableName, hasTableName := GetMessageTableName(child); hasTableName {
 			logger.Debug("found protobuf message with parquet table extension", zap.String("table_name", tableName), zap.String("message_name", string(child.Name())))
@@ -72,7 +81,7 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, de
 			})))
 		}
 
-		return out, ProtoRowExtractorFromTables(out)
+		return out, ProtoRowExtractorFromTables(out), nil
 	}
 
 	// Otherwise, let's support the case to pickup each repeated fields as a table
@@ -87,7 +96,7 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, de
 				descriptor,
 				parquet.NewSchema(tableName, newMessageNode(descriptor, defaultColumnCompression)),
 			),
-		}, ProtoRowExtractorFromRoot(tableName)
+		}, ProtoRowExtractorFromRoot(tableName), nil
 	}
 
 	// We skip fields that are repeated of primitive types for now
@@ -111,7 +120,7 @@ func FindTablesInMessageDescriptor(descriptor protoreflect.MessageDescriptor, de
 		repeatedFields[tableName] = field
 	}
 
-	return out, ProtoRowExtractorFromRepeatedFields(repeatedFields)
+	return out, ProtoRowExtractorFromRepeatedFields(repeatedFields), nil
 }
 
 func GetMessageTableName(descriptor protoreflect.MessageDescriptor) (string, bool) {
@@ -163,10 +172,14 @@ func toParquetField(field protoreflect.FieldDescriptor, defaultColumnCompression
 
 	// If a compression is explicitly set on the column, it has precedence over the default column compression
 	if hasColumnDef && columnDef.Compression != nil {
+		if !node.Leaf() {
+			panic(fmt.Errorf("compression can only be applied to leaf nodes, but field %s is not a leaf", field.FullName()))
+		}
+
 		if columnDef.GetCompression() != parquetpb.Compression_UNCOMPRESSED {
 			node = parquet.Compressed(node, compressionToParquetCompressionCodec(columnDef.GetCompression()))
 		}
-	} else if defaultColumnCompression != nil && *defaultColumnCompression != pbparquet.Compression_UNCOMPRESSED {
+	} else if node.Leaf() && defaultColumnCompression != nil && *defaultColumnCompression != pbparquet.Compression_UNCOMPRESSED {
 		node = parquet.Compressed(node, compressionToParquetCompressionCodec(*defaultColumnCompression))
 	}
 
@@ -424,4 +437,12 @@ func goTypeOfNode(node parquet.Node) reflect.Type {
 func exportedStructFieldName(name string) string {
 	firstRune, size := utf8.DecodeRuneInString(name)
 	return string([]rune{unicode.ToUpper(firstRune)}) + name[size:]
+}
+
+func recoveredAnyToError(recovered any) error {
+	if err, ok := recovered.(error); ok {
+		return err
+	}
+
+	return fmt.Errorf("%v", recovered)
 }

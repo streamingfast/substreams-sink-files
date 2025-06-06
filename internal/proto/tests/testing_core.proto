@@ -73,7 +73,7 @@ message Row {
 
 // Kept in sync with the Row message, we use RowT to test the parquet.table_name option
 message RowT {
-    option (parquet.table_name) = "rows";
+    option (parquet.table) = {name: "rows"};
 
     string typeString = 1;
     int32 typeInt32 = 2;
@@ -104,10 +104,6 @@ message RowColumnTypeUint256 {
 message RowColumnTypeInt256 {
     string positive = 1 [(parquet.column) = {type: INT256}];
     string negative = 2 [(parquet.column) = {type: INT256}];
-}
-
-message RowColumnCompressionZstd {
-    string value = 1 [(parquet.column) = {compression: ZSTD}];
 }
 
 message RowColumnRepeatedString {

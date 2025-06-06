@@ -52,7 +52,16 @@ func toolsParquetSchemaE(cmd *cobra.Command, args []string) error {
 	parquetWriterOptions, err := writer.NewParquetWriterOptions(readCommonParquetFlags(cmd).AsParquetWriterOptions())
 	cli.NoError(err, "Failed to create parquet writer options")
 
-	tables, _ := parquetx.FindTablesInMessageDescriptor(descriptor, parquetWriterOptions.DefaultColumnCompression, zlog, tracer)
+	tables, _, err := parquetx.FindTablesInMessageDescriptor(descriptor, parquetWriterOptions.DefaultColumnCompression, zlog, tracer)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to find tables in message descriptor %q\n", descriptor.FullName())
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Println()
+		fmt.Fprintf(os.Stderr, "This error might be due to missing support in the library for certain Protobuf field types or annotations.\n")
+		fmt.Fprintf(os.Stderr, "Please check that your Protobuf schema uses supported field types and consider filing an issue if this is unexpected.\n")
+		os.Exit(1)
+	}
+
 	if len(tables) == 0 {
 		fmt.Printf("No tables found or inferred in message descriptor %q\n", descriptor.FullName())
 		os.Exit(1)

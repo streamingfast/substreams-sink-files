@@ -42,7 +42,11 @@ func NewParquetWriter(descriptor protoreflect.MessageDescriptor, logger *zap.Log
 		return nil, fmt.Errorf("invalid parquet writer options: %w", err)
 	}
 
-	tables, rowExtractor := parquetx.FindTablesInMessageDescriptor(descriptor, options.DefaultColumnCompression, logger, tracer)
+	tables, rowExtractor, err := parquetx.FindTablesInMessageDescriptor(descriptor, options.DefaultColumnCompression, logger, tracer)
+	if err != nil {
+		return nil, fmt.Errorf("find tables: %w", err)
+	}
+
 	if len(tables) == 0 {
 		return nil, fmt.Errorf("no tables found in message descriptor")
 	}

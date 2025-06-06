@@ -6,7 +6,6 @@ import "parquet/options.proto";
 
 option go_package = "github.com/streamingfast/substreams-sink-files/internal/pb/testing;pbtesting";
 
-
 message RowColumnNestedMessage {
     option (parquet.table_name) = "rows";
 
@@ -32,3 +31,5 @@ message Nested {
 message Repeated {
     repeated string value = 1;
 }
+
+
