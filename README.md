@@ -26,7 +26,7 @@ The Parquet encoder is the default encoder when no `--encoder` flag is specified
 substreams-sink-files run <endpoint> <manifest_or_spkg> <module_name> <output_path> <start_block>:<stop_block>
 ```
 
-**Example with Uniswap V3 Substreams:**
+**Example with Ethereum USDT Events:**
 
 ```bash
 substreams-sink-files run mainnet.eth.streamingfast.io:443 substreams_ethereum_usdt@v0.1.0 map_events \
@@ -38,7 +38,7 @@ substreams-sink-files run mainnet.eth.streamingfast.io:443 substreams_ethereum_u
 > [!NOTE]
 > If you have your own `.spkg`, simply replace `substreams_ethereum_usdt@v0.1.0` by it to use your own Substreams.
 
-This will process 10,000 blocks starting from block 12,369,621 and create Parquet files in the `./parquet_output` directory, with each file containing data from 1,000 blocks.
+This will process 10,000 blocks starting from block 20,000,000 and create Parquet files in the `./parquet_output` directory, with each file containing data from 1,000 blocks.
 
 **Inspecting the Schema:**
 
