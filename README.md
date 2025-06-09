@@ -54,7 +54,7 @@ This will show you:
 - Any detected annotations or custom column types
 - The complete Parquet schema that would be generated
 
-For the Uniswap V3 example above, you might see output like:
+For the USDT events example above, you might see output like:
 ```
 ----------------------- Table from contract.v1.Transfer -----------------------
 message transfers {
