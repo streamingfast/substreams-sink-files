@@ -9,10 +9,205 @@ Install `substreams-sink-files` by using the pre-built binary release [available
 
 The sink supports different Substreams output module's type, here a jump list of today's supported formats:
 
+- [Parquet](#parquet)
 - [Line-based CSV](#jsonl-csv-and-any-other-line-based-format)
 - [Line-based JSONL](#jsonl-csv-and-any-other-line-based-format)
 - [Arbitrary Protobuf to JSONL](#arbitrary-protobuf-to-jsonl-protojsonjq-like-expression-encoder)
-- Parquet
+
+### Parquet
+
+The `substreams-sink-files` tool includes a powerful Parquet encoder designed to work seamlessly with any Protobuf message output from your Substreams module. This encoder automatically converts your Protobuf schema into an optimized Parquet schema, enabling efficient columnar storage and analytics.
+
+The Parquet encoder is the default encoder when no `--encoder` flag is specified. It intelligently infers table structures from your Protobuf messages or uses explicit annotations for fine-grained control over the output schema.
+
+**Basic Usage:**
+
+```bash
+substreams-sink-files run <endpoint> <manifest_or_spkg> <module_name> <output_path> <start_block>:<stop_block>
+```
+
+**Example with Uniswap V3 Substreams:**
+
+```bash
+substreams-sink-files run mainnet.eth.streamingfast.io:443 substreams_ethereum_usdt@v0.1.0 map_events \
+    ./parquet_output \
+    20_000_000:+10000 \
+    --file-block-count=1000
+```
+
+> [!NOTE]
+> If you have your own `.spkg`, simply replace `substreams_ethereum_usdt@v0.1.0` by it to use your own Substreams.
+
+This will process 10,000 blocks starting from block 12,369,621 and create Parquet files in the `./parquet_output` directory, with each file containing data from 1,000 blocks.
+
+**Inspecting the Schema:**
+
+To see what Parquet schema would be derived from your Substreams module without running the full extraction, use the `inspect` command:
+
+```bash
+substreams-sink-files tools parquet schema substreams_ethereum_usdt@v0.1.0 map_events
+```
+
+This will show you:
+- The inferred table names and structures
+- Column types and their Parquet mappings
+- Any detected annotations or custom column types
+- The complete Parquet schema that would be generated
+
+For the Uniswap V3 example above, you might see output like:
+```
+----------------------- Table from contract.v1.Transfer -----------------------
+message transfers {
+    required binary evt_tx_hash (STRING);
+    required int32 evt_index (INT(32,false));
+    required int64 evt_block_time (TIMESTAMP(isAdjustedToUTC=true,unit=NANOS));
+    required int64 evt_block_number (INT(64,false));
+    required binary from;
+    required binary to;
+    required binary value (STRING);
+}
+-------------------------------------------------------------------------------
+...
+```
+
+#### Default Table Inference
+
+When your Protobuf message doesn't use explicit Parquet annotations, the sink automatically infers table structures using the following rules:
+
+**1. Single Table from Root Message**
+
+If your output message contains no repeated fields of message types, the entire message becomes a single table:
+
+```proto
+message PoolCreated {
+    string pool_address = 1;
+    string token0 = 2;
+    string token1 = 3;
+    uint64 block_number = 4;
+}
+```
+
+This creates a table named `pool_created` where each Substreams output message becomes one row.
+
+**2. Multiple Tables from Repeated Fields**
+
+If your output message contains repeated fields of message types, each repeated field becomes a separate table:
+
+```proto
+message BlockEvents {
+    repeated SwapEvent swaps = 1;
+    repeated MintEvent mints = 2;
+    repeated BurnEvent burns = 3;
+}
+
+message SwapEvent {
+    string pool = 1;
+    string amount0 = 2;
+    string amount1 = 3;
+}
+
+message MintEvent {
+    string pool = 1;
+    string liquidity = 2;
+}
+```
+
+This creates three tables: `swaps`, `mints`, and `burns`. All swap events from all processed blocks are collected into the `swaps` table, and so on.
+
+#### Parquet Table Annotation
+
+For explicit control over table creation, use the `(parquet.table_name)` option to designate specific messages as tables:
+
+```proto
+import "sf/substreams/sink/files/v1/parquet.proto";
+
+message TransferEvent {
+    option (parquet.table_name) = "erc20_transfers";
+
+    string transaction_hash = 1;
+    string from_address = 2;
+    string to_address = 3;
+    string amount = 4;
+    uint64 block_number = 5;
+}
+
+message SwapEvent {
+    option (parquet.table_name) = "dex_swaps";
+
+    string pool_address = 1;
+    string token_in = 2;
+    string token_out = 3;
+    string amount_in = 4;
+    string amount_out = 5;
+}
+
+message AllEvents {
+    repeated TransferEvent transfers = 1;
+    repeated SwapEvent swaps = 2;
+    // These nested messages in other_data won't become tables
+    SomeOtherData other_data = 3;
+}
+```
+
+When processing `AllEvents`, the sink creates two tables: `erc20_transfers` and `dex_swaps`, while ignoring the `other_data` field for table creation.
+
+#### Parquet Column Annotation
+
+Fine-tune individual columns using the `(parquet.column)` option for custom data types and compression:
+
+```proto
+import "sf/substreams/sink/files/v1/parquet.proto";
+
+message Transaction {
+    option (parquet.table_name) = "transactions";
+
+    string hash = 1;
+    string from_address = 2;
+    string to_address = 3;
+
+    // Store as 256-bit integer in 32-byte fixed array
+    string value = 4 [(parquet.column) = {type: UINT256}];
+
+    // Compress this column with ZSTD
+    bytes input_data = 5 [(parquet.column) = {compression: ZSTD}];
+
+    // Ignore this field in Parquet output
+    string debug_info = 6 [(parquet.ignored) = true];
+
+    // Optional field (properly handles null values)
+    optional string contract_address = 7;
+
+    // Repeated primitive fields
+    repeated string logs = 8;
+}
+```
+
+**Available Column Types:**
+- `UINT256`: Stores string representations of 256-bit unsigned integers as 32-byte fixed arrays
+
+  > [!IMPORTANT]
+  > **UINT256 Engine Compatibility**: The interpretation of UINT256 values may differ depending on the analytics engine or tool reading the Parquet files. The raw 32-byte value is stored consistently, but different engines may interpret the byte order differently:
+  > - **ClickHouse**: With Physical type `FixedByte(32)` and Logical type `Decimal(N, 0)` expects big-endian format
+  > - **ClickHouse**: With Physical type `FixedByte(32)` and Logical type `None` expects little-endian format
+  > - **Other engines**: May have their own interpretation rules
+  >
+  > Currently, the sink stores UINT256 values in big-endian format. If you encounter issues with a specific analytics engine, please file an issue with details about your use case.
+
+**Available Compression Options:**
+- `UNCOMPRESSED` (default)
+- `SNAPPY`
+- `GZIP`
+- `LZ4_RAW`
+- `BROTLI`
+- `ZSTD`
+
+You can also set default compression for all columns:
+
+```bash
+substreams-sink-files run ... --parquet-default-compression=snappy
+```
+
+Column-specific compression annotations override the default compression setting.
 
 ### JSONL, CSV and any other line based format
 
