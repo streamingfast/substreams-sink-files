@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 )
 
 var _ Writer = (*BufferedIO)(nil)
+var _ TimestampAware = (*BufferedIO)(nil)
+var _ BoundaryAdjustable = (*BufferedIO)(nil)
 
 type BufferedIO struct {
 	baseWriter
@@ -21,6 +25,11 @@ type BufferedIO struct {
 	bufferMazSize uint64
 	workingDir    string
 	activeFile    *bufferedActiveFile
+
+	// Date partitioning fields
+	currentTimestamp time.Time
+	dateFormat       string
+	datePartitioning bool
 }
 
 func NewBufferedIO(
@@ -55,7 +64,7 @@ func (s *BufferedIO) StartBoundary(blockRange *bstream.Range) error {
 		lazyFile:       lazyFile,
 		writer:         NewIntelligentWriterSize(lazyFile, int(s.bufferMazSize)),
 		blockRange:     blockRange,
-		outputFilename: s.filename(blockRange),
+		outputFilename: "", // Will be generated when boundary closes
 	}
 
 	s.activeFile = a
@@ -71,11 +80,14 @@ func (s *BufferedIO) CloseBoundary(ctx context.Context) (Uploadeable, error) {
 		return nil, fmt.Errorf("no active file")
 	}
 
+	// Generate output filename now that we have processed blocks and potentially have a timestamp
+	outputFilename := s.generateOutputFilename(s.activeFile.blockRange)
+
 	if s.activeFile.writer.AllDataFitInMemory() {
 		s.zlogger.Info("all data from range is in memory, no need to flush")
 		return &dataFile{
 			reader:         bytes.NewReader(s.activeFile.writer.MemoryData()),
-			outputFilename: s.activeFile.outputFilename,
+			outputFilename: outputFilename,
 		}, nil
 	}
 
@@ -91,7 +103,7 @@ func (s *BufferedIO) CloseBoundary(ctx context.Context) (Uploadeable, error) {
 	workingPath := s.activeFile.Path()
 	return &localFile{
 		localFilePath:  workingPath,
-		outputFilename: s.activeFile.outputFilename,
+		outputFilename: outputFilename,
 	}, nil
 }
 
@@ -268,4 +280,33 @@ type bufferedActiveFile struct {
 
 func (f *bufferedActiveFile) Path() string {
 	return f.lazyFile.path
+}
+
+// SetCurrentTimestamp implements TimestampAware interface
+func (s *BufferedIO) SetCurrentTimestamp(t time.Time) {
+	s.currentTimestamp = t
+}
+
+// SetDatePartitioning configures date-based partitioning
+func (s *BufferedIO) SetDatePartitioning(enabled bool, format string) {
+	s.datePartitioning = enabled
+	s.dateFormat = format
+}
+
+func (s *BufferedIO) generateOutputFilename(blockRange *bstream.Range) string {
+	baseFilename := fmt.Sprintf("%010d-%010d.%s", blockRange.StartBlock(), (*blockRange.EndBlock()), s.fileType)
+
+	if s.datePartitioning && !s.currentTimestamp.IsZero() {
+		dateDir := s.currentTimestamp.UTC().Format(s.dateFormat)
+		return path.Join(dateDir, baseFilename)
+	}
+
+	return baseFilename
+}
+
+// AdjustBoundary implements BoundaryAdjustable interface
+func (s *BufferedIO) AdjustBoundary(newRange *bstream.Range) {
+	if s.activeFile != nil {
+		s.activeFile.blockRange = newRange
+	}
 }

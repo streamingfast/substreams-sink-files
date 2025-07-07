@@ -26,6 +26,12 @@ type Bundler struct {
 	activeBoundary *bstream.Range
 	uploadQueue    *dhammer.Nailer
 	zlogger        *zap.Logger
+
+	// Date-aware boundary management
+	datePartitioningEnabled bool
+	dateFormat              string
+	currentBoundaryDate     string
+	lastProcessedBlock      uint64
 }
 
 func New(
@@ -85,8 +91,48 @@ func (b *Bundler) GetCursor() (*sink.Cursor, error) {
 	return b.stateStore.ReadCursor()
 }
 
-func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
+func (b *Bundler) SetDatePartitioning(enabled bool, format string) {
+	b.datePartitioningEnabled = enabled
+	b.dateFormat = format
+}
+
+func (b *Bundler) RollWithDateCheck(ctx context.Context, blockNum uint64, blockTime time.Time) error {
+	// Initialize boundary date if this is the first block with a timestamp
+	if b.datePartitioningEnabled && !blockTime.IsZero() && b.currentBoundaryDate == "" {
+		b.currentBoundaryDate = blockTime.UTC().Format(b.dateFormat)
+		b.zlogger.Info("initialized boundary date",
+			zap.Uint64("block_num", blockNum),
+			zap.String("boundary_date", b.currentBoundaryDate),
+		)
+	}
+
+	// Check if date partitioning requires early boundary closure
+	if b.datePartitioningEnabled && b.shouldCloseForDateChange(blockTime) {
+		b.zlogger.Info("closing boundary due to date change",
+			zap.Uint64("block_num", blockNum),
+			zap.String("current_date", b.currentBoundaryDate),
+			zap.String("new_date", blockTime.UTC().Format(b.dateFormat)),
+		)
+
+		// Close current boundary with actual processed blocks
+		if err := b.stopWithActualRange(ctx); err != nil {
+			return fmt.Errorf("stop boundary for date change: %w", err)
+		}
+
+		// Start new boundary at current block
+		if err := b.Start(blockNum); err != nil {
+			return fmt.Errorf("start boundary after date change: %w", err)
+		}
+
+		// Update the boundary date
+		b.currentBoundaryDate = blockTime.UTC().Format(b.dateFormat)
+		b.lastProcessedBlock = blockNum
+		return nil
+	}
+
+	// Regular block count based rolling
 	if b.activeBoundary.Contains(blockNum) {
+		b.lastProcessedBlock = blockNum
 		return nil
 	}
 
@@ -114,6 +160,62 @@ func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
 	if err := b.Start(blockNum); err != nil {
 		return fmt.Errorf("start skipping boundary: %w", err)
 	}
+
+	b.lastProcessedBlock = blockNum
+	return nil
+}
+
+// shouldCloseForDateChange checks if the current block's date is different from the boundary's date
+func (b *Bundler) shouldCloseForDateChange(blockTime time.Time) bool {
+	if !b.datePartitioningEnabled || b.activeBoundary == nil || blockTime.IsZero() {
+		return false
+	}
+
+	blockDate := blockTime.UTC().Format(b.dateFormat)
+	return b.currentBoundaryDate != "" && b.currentBoundaryDate != blockDate
+}
+
+// stopWithActualRange closes the current boundary but adjusts the end block to the last processed block
+func (b *Bundler) stopWithActualRange(ctx context.Context) error {
+	if b.activeBoundary == nil {
+		return nil
+	}
+
+	b.zlogger.Info("stopping file boundary with actual range",
+		zap.Uint64("original_end", *b.activeBoundary.EndBlock()),
+		zap.Uint64("actual_end", b.lastProcessedBlock+1),
+	)
+
+	// Create adjusted range with actual processed blocks
+	adjustedRange := bstream.NewRangeExcludingEnd(b.activeBoundary.StartBlock(), b.lastProcessedBlock+1)
+
+	// Update the writer's boundary if it supports adjustment
+	if adjustable, ok := b.boundaryWriter.(writer.BoundaryAdjustable); ok {
+		adjustable.AdjustBoundary(adjustedRange)
+	}
+
+	file, err := b.boundaryWriter.CloseBoundary(ctx)
+	if err != nil {
+		return fmt.Errorf("closing file: %w", err)
+	}
+
+	state, err := b.stateStore.GetState()
+	if err != nil {
+		return fmt.Errorf("failed to encode state: %w", err)
+	}
+
+	b.zlogger.Info("queuing boundary upload",
+		zap.Stringer("boundary", adjustedRange),
+	)
+	b.uploadQueue.In <- &boundaryFile{
+		name:  adjustedRange.String(),
+		file:  file,
+		state: state,
+	}
+
+	b.activeBoundary = nil
+	b.stats.endBoundary()
+	b.zlogger.Info("bundler stats", b.stats.Log()...)
 	return nil
 }
 
@@ -132,6 +234,7 @@ func (b *Bundler) SetCursor(cursor *sink.Cursor) {
 func (b *Bundler) Start(blockNum uint64) error {
 	boundaryRange := b.newBoundary(blockNum)
 	b.activeBoundary = boundaryRange
+	b.lastProcessedBlock = blockNum
 
 	b.zlogger.Info("starting new file boundary", zap.Stringer("boundary", boundaryRange))
 	if err := b.boundaryWriter.StartBoundary(boundaryRange); err != nil {
@@ -141,6 +244,7 @@ func (b *Bundler) Start(blockNum uint64) error {
 	b.stats.startBoundary(boundaryRange)
 	b.zlogger.Info("boundary started", zap.Stringer("boundary", boundaryRange))
 	b.stateStore.NewBoundary(boundaryRange)
+
 	return nil
 }
 
@@ -212,4 +316,9 @@ func (b *Bundler) uploadBoundary(ctx context.Context, v interface{}) (interface{
 	)
 
 	return bf, nil
+}
+
+// Roll is kept for backward compatibility but should use RollWithDateCheck when possible
+func (b *Bundler) Roll(ctx context.Context, blockNum uint64) error {
+	return b.RollWithDateCheck(ctx, blockNum, time.Time{})
 }
