@@ -1,12 +1,8 @@
 version: v1
 name: buf.build/streamingfast/substreams-sink-files
-
-deps: []
-
 lint:
   use:
     - DEFAULT
-
 breaking:
   use:
     - FILE
