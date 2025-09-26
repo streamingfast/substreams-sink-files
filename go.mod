@@ -17,7 +17,7 @@ require (
 	github.com/streamingfast/dstore v0.1.1-0.20250609173504-95368d3441ee
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091
 	github.com/streamingfast/shutter v1.5.0
-	github.com/streamingfast/substreams v1.16.7-0.20250926190753-c700f411b42c
+	github.com/streamingfast/substreams v1.16.7-0.20250926191809-d8a157e16ef6
 	github.com/test-go/testify v1.1.4
 	go.uber.org/zap v1.27.0
 )
