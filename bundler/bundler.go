@@ -9,9 +9,9 @@ import (
 	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/shutter"
-	sink "github.com/streamingfast/substreams-sink"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/state"
+	sink "github.com/streamingfast/substreams/sink"
 	"go.uber.org/zap"
 )
 

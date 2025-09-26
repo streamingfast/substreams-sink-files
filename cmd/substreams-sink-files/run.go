@@ -14,7 +14,6 @@ import (
 	. "github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
 	"github.com/streamingfast/dstore"
-	sink "github.com/streamingfast/substreams-sink"
 	substreamsfile "github.com/streamingfast/substreams-sink-files"
 	"github.com/streamingfast/substreams-sink-files/bundler"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
@@ -22,19 +21,24 @@ import (
 	"github.com/streamingfast/substreams-sink-files/protox"
 	"github.com/streamingfast/substreams-sink-files/state"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	sink "github.com/streamingfast/substreams/sink"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 var SyncRunCmd = Command(syncRunE,
-	"run <manifest> <module> <output_store> [<start>:<stop>]",
+	"run <manifest> [<module>] [--start-block=<num>] [--stop-block=<num>]",
 	"Runs extractor code",
-	RangeArgs(4, 5),
+	RangeArgs(1, 2),
 	Flags(func(flags *pflag.FlagSet) {
 		sink.AddFlagsToSet(flags)
 
-		flags.String("file-working-dir", "./localdata/working", "Working store where we accumulate data")
+		flags.StringP("output-dir", "o", "./output", FlagMultiLineDescription(`
+			Output store where to write files, supports gs://, s3://, file:// and local paths,
+			see https://github.com/streamingfast/dstore?tab=readme-ov-file#features for supported syntax.
+		`))
 		flags.String("state-store", "./state.yaml", "Output path where to store latest received cursor, if empty, cursor will not be persisted")
+		flags.String("file-working-dir", "./localdata/working", "Working store where we accumulate data")
 		flags.Uint64P("file-block-count", "c", 10000, "Number of blocks per file")
 		flags.String("encoder", "parquet", FlagMultiLineDescription(`
 			Sets which encoder to use to parse the Substreams Output Module data. Options are: 'parquet', 'lines', 'protojson:<jq like expression>'
@@ -105,25 +109,35 @@ var SyncRunCmd = Command(syncRunE,
 
 		addCommonParquetFlags(flags)
 	}),
-	ExamplePrefixed("substreams-sink-files run",
-		"mainnet.eth.streamingfast.io:443 substreams.spkg map_transfers '.transfers[]' ./localdata",
-	),
+	ExamplePrefixed("substreams-sink-files run", `
+		# Extract USDT events to Parquet
+		substreams_ethereum_usdt@v0.1.0 map_events ./output --encoder=parquet --start-block=20000000 --stop-block=+1000
+
+		# Extract USDT events to Parquet with custom block count per file
+		substreams_ethereum_usdt@v0.1.0 map_events ./output --encoder=parquet --start-block=20000000 --stop-block=+1000 --file-block-count=100
+
+		# Extract to JSONL format using 'protojson' encoder
+		substreams_ethereum_usdt@v0.1.0 map_events ./output --encoder=protojson:.transfers[]
+
+		# Extract CSV line-based data using lines encoder
+		substreams_ethereum_usdt@v0.1.0 map_transfer_csv_lines ./output --encoder=lines
+
+		# Extract JSON line-based data using lines encoder
+		substreams_ethereum_usdt@v0.1.0 map_transfer_json_lines ./output --encoder=lines
+	`),
 )
 
 func syncRunE(cmd *cobra.Command, args []string) error {
 	app := cli.NewApplication(cmd.Context())
 
-	sink.RegisterMetrics()
+	manifestPath := args[0]
+	outputModuleName := sink.InferOutputModuleFromPackage
 
-	endpoint := args[0]
-	manifestPath := args[1]
-	outputModuleName := args[2]
-	fileOutputPath := args[3]
-	blockRange := ""
-	if len(args) > 4 {
-		blockRange = args[4]
+	if len(args) > 1 {
+		outputModuleName = args[1]
 	}
 
+	fileOutputPath := sflags.MustGetString(cmd, "output-dir")
 	fileWorkingDir := sflags.MustGetString(cmd, "file-working-dir")
 	stateStorePath := sflags.MustGetString(cmd, "state-store")
 	blocksPerFile := sflags.MustGetUint64(cmd, "file-block-count")
@@ -141,7 +155,8 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 
 	sinker, err := sink.NewFromViper(cmd,
 		sink.IgnoreOutputModuleType,
-		endpoint, manifestPath, outputModuleName, blockRange,
+		manifestPath, outputModuleName,
+		"substreams-sink-files",
 		zlog,
 		tracer,
 	)

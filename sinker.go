@@ -7,10 +7,10 @@ import (
 
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
-	sink "github.com/streamingfast/substreams-sink"
 	"github.com/streamingfast/substreams-sink-files/bundler"
 	"github.com/streamingfast/substreams-sink-files/encoder"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	sink "github.com/streamingfast/substreams/sink"
 	"go.uber.org/zap"
 )
 

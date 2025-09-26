@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v3.0.0
+
+### **Breaking Changes**
+
+* **CLI Interface Change**: Updated the CLI interface to align with the new `substreams/sink` package:
+  - **Endpoint inference**: The `<endpoint>` parameter has been removed and is now automatically inferred from the manifest's network definition, but can always be overridden with the `--endpoint` flag
+  - **Updated command syntax**: Changed from `run <endpoint> <manifest> <module> <output_store> [<start>:<stop>]` to `run [<manifest> [<module>]] [--start-block=<num>] [--stop-block=<num>]`
+  - **Output directory flag**: The output path is now specified via `--output-dir` (short: `-o`) flag instead of a positional argument
+  - **Block range format**: Block ranges are now specified using separate `--start-block` and `--stop-block` flags instead of the `<start>:<stop>` format
+  - **Flag changes**:
+    - Added `--output-dir` (short: `-o`) for specifying output directory
+
+* **Dependency Migration**: Replaced `github.com/streamingfast/substreams-sink` with `github.com/streamingfast/substreams/sink` which normalizes command line arguments across all substreams sink tools.
+
+### Migration Examples
+
+Here are common Parquet extraction scenarios showing the changes from v2.x to v3.0.0:
+
+**Basic Parquet extraction (no block range):**
+```bash
+# v2.x
+substreams-sink-files run mainnet.eth.streamingfast.io:443 substreams_ethereum_usdt@v0.1.0 map_events ./output
+
+# v3.0.0 (endpoint inferred from manifest's network)
+substreams-sink-files run substreams_ethereum_usdt@v0.1.0 map_events --output-dir ./output
+
+# v3.0.0 (explicit endpoint override)
+substreams-sink-files run substreams_ethereum_usdt@v0.1.0 map_events --output-dir ./output --endpoint mainnet.eth.streamingfast.io:443
+```
+
+**Parquet extraction with block range:**
+```bash
+# v2.x
+substreams-sink-files run mainnet.eth.streamingfast.io:443 substreams_ethereum_usdt@v0.1.0 map_events ./output 20000000:20010000
+
+# v3.0.0 (endpoint inferred from manifest)
+substreams-sink-files run substreams_ethereum_usdt@v0.1.0 map_events --output-dir ./output --start-block 20000000 --stop-block 20010000
+```
+
+**Parquet extraction with custom endpoint:**
+```bash
+# v2.x
+substreams-sink-files run my-custom-endpoint:443 substreams_ethereum_usdt@v0.1.0 map_events ./output --file-block-count 1000
+
+# v3.0.0
+substreams-sink-files run substreams_ethereum_usdt@v0.1.0 map_events --output-dir ./output --endpoint my-custom-endpoint:443 --file-block-count 1000
+```
+
 ## v2.2.0
 
 * **Beta** Ship first version of Parquet support.

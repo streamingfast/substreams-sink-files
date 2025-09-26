@@ -2,7 +2,7 @@ package state
 
 import (
 	"github.com/streamingfast/bstream"
-	sink "github.com/streamingfast/substreams-sink"
+	sink "github.com/streamingfast/substreams/sink"
 )
 
 type Store interface {

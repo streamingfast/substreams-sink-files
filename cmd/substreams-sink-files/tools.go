@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/cli"
 	. "github.com/streamingfast/cli"
-	sink "github.com/streamingfast/substreams-sink"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/parquetx"
+	sink "github.com/streamingfast/substreams/sink"
 )
 
 var ToolsParquet = Group("parquet", "Parquet related tools",
@@ -39,6 +39,7 @@ func toolsParquetSchemaE(cmd *cobra.Command, args []string) error {
 		moduleName,
 		sink.IgnoreOutputModuleType,
 		false,
+		nil,
 		zlog,
 	)
 	cli.NoError(err, "Read manifest failed")

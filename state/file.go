@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
-	sink "github.com/streamingfast/substreams-sink"
+	sink "github.com/streamingfast/substreams/sink"
 	"gopkg.in/yaml.v3"
 )
 
