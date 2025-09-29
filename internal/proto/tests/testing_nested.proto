@@ -32,4 +32,27 @@ message Repeated {
     repeated string value = 1;
 }
 
+message FlattenedMessage {
+    option (parquet.table_name) = "flattened";
+
+    optional string number = 1;
+    string id = 2;
+    bool success = 3;
+    optional string memo = 4;
+    repeated FlattenedOperation operations = 5;
+    repeated TokenMetadata metadata = 6;
+    optional string provider = 7;
+}
+
+message FlattenedOperation {
+    string id = 1;
+    string token = 2;
+}
+
+message TokenMetadata {
+    string address = 1;
+    optional string symbol = 2;
+    string decimals = 3;
+}
+
 

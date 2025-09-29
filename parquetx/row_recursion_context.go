@@ -39,10 +39,9 @@ type recursionContext struct {
 
 	repeatingLastIndex int
 
-	// We use same underlying type as parquet.Value
-	columnIndex     int16
 	repetitionLevel byte
 	definitionLevel byte
+	lastColumnIndex int
 }
 
 func newRecursionContext(root protoreflect.Message, logger *zap.Logger, tracer logging.Tracer) *recursionContext {
@@ -88,7 +87,9 @@ func (p *recursionContext) StartRepeated(count int) {
 func (p *recursionContext) RepeatedIterationCompleted(i int) {
 	if i == 0 {
 		p.firstRepeatedComplete()
-	} else if i == p.repeatingLastIndex {
+	}
+
+	if i == p.repeatingLastIndex {
 		p.lastRepeatedComplete()
 	}
 }
@@ -100,7 +101,6 @@ func (p *recursionContext) firstRepeatedComplete() {
 			zap.String("change", "repetition_level++"),
 		)
 	}
-	p.repeatingLastIndex = 0
 	p.repetitionLevel++
 }
 
@@ -174,23 +174,34 @@ func (p *recursionContext) String() string {
 
 var _ valueLeveler = (*recursionContext)(nil)
 
-// NullValue implements valueLeveler.
-func (p *recursionContext) NullValue() parquet.Value {
-	return parquet.NullValue().Level(int(p.repetitionLevel), int(p.definitionLevel), int(p.columnIndex))
+// NullValue represents a null value at the current repetition and definition level for the current column index,
+// empty repeated array and optional fields are represented using this method.
+func (p *recursionContext) NullValue(columnIndex int) parquet.Value {
+	if p.tracer.Enabled() {
+		p.logger.Debug("creating null value",
+			zap.Int("repetition_level", int(p.repetitionLevel)),
+			zap.Int("definition_level", int(p.definitionLevel)),
+			zap.Int("column_index", columnIndex),
+		)
+	}
+
+	p.lastColumnIndex = columnIndex
+	return parquet.NullValue().Level(int(p.repetitionLevel), int(p.definitionLevel), columnIndex)
 }
 
-// Level implements valueLeveler.
-func (p *recursionContext) Level(value parquet.Value) parquet.Value {
+// Level applies repetition/definition levels for the given column index.
+func (p *recursionContext) Level(value parquet.Value, columnIndex int) parquet.Value {
 	if p.tracer.Enabled() {
 		p.logger.Debug("setting level on value",
 			zap.Stringer("value", (*zapParquetValue)(&value)),
 			zap.Int("repetition_level", int(p.repetitionLevel)),
 			zap.Int("definition_level", int(p.definitionLevel)),
-			zap.Int("column_index", int(p.columnIndex)),
+			zap.Int("column_index", columnIndex),
 		)
 	}
 
-	return value.Level(int(p.repetitionLevel), int(p.definitionLevel), int(p.columnIndex))
+	p.lastColumnIndex = columnIndex
+	return value.Level(int(p.repetitionLevel), int(p.definitionLevel), columnIndex)
 }
 
 type zapParquetValue parquet.Value

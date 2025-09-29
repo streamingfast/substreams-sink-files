@@ -132,6 +132,9 @@ func IsFieldIgnored(field protoreflect.FieldDescriptor) bool {
 	return ignored
 }
 
+// GetColumnType returns the column type defined in the protobuf schema using the
+// `(parquet.column).type` extension. If no type is defined, it returns
+// `parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE` and false.
 func GetFieldColumnType(field protoreflect.FieldDescriptor) (parquetpb.ColumnType, bool) {
 	if columnDef, _ := protox.GetFieldExtensionValue(field, parquetpb.E_Column, (*pbparquet.Column)(nil)); columnDef.GetType() != pbparquet.ColumnType_UNSPECIFIED_COLUMN_TYPE {
 		return *columnDef.Type, true

@@ -17,8 +17,9 @@ import (
 // for now.
 //
 // At term, this will handle nested messages and repeated fields of any depth.
-func ProtoMessageToRow(message protoreflect.Message) (row parquet.Row, err error) {
+func ProtoMessageToRow(message protoreflect.Message) (parquet.Row, error) {
 	recursionCtx := newRecursionContext(message, zlog, tracer)
+	totalColumns := messageLeafColumnCount(message.Descriptor())
 
 	if tracer.Enabled() {
 		logger := zlog.With(
@@ -27,7 +28,7 @@ func ProtoMessageToRow(message protoreflect.Message) (row parquet.Row, err error
 
 		logger.Debug("processing root message")
 		defer func() {
-			logger.Debug("root message processed", zap.Int16("column_count", recursionCtx.columnIndex-1), zap.Int("value_count", len(row)))
+			logger.Debug("root message processed", zap.Int("column_count", totalColumns))
 		}()
 	}
 
@@ -43,62 +44,155 @@ func ProtoMessageToRow(message protoreflect.Message) (row parquet.Row, err error
 	// See https://blog.x.com/engineering/en_us/a/2013/dremel-made-simple-with-parquet
 	// for more information about the Dremel encoding.
 
-	var columns []parquet.Value
-
-	addColumn := func(values ...parquet.Value) {
-		if tracer.Enabled() {
-			zlog.Debug("adding column values", zap.Int("column_index", int(recursionCtx.columnIndex)), zap.Int("value_count", len(values)))
-		}
-
-		columns = append(columns, values...)
-		recursionCtx.columnIndex++
+	values, err := protoMessageToValues(recursionCtx, message, 0)
+	if err != nil {
+		return nil, fmt.Errorf("root message: %w", err)
 	}
 
-	messageDesc := message.Descriptor()
-	fields := messageDesc.Fields()
-
-	for i := range fields.Len() {
-		values, err := protoFieldToValues(recursionCtx, message, fields.Get(i))
-		if err != nil {
-			return nil, fmt.Errorf("root message: %w", err)
+	columns := make([][]parquet.Value, totalColumns)
+	for _, value := range values {
+		columnIndex := value.Column()
+		if columnIndex < 0 || columnIndex >= totalColumns {
+			return nil, fmt.Errorf("value column index %d is outside of total column count %d", columnIndex, totalColumns)
 		}
 
-		// If the field is ignored, there will be no values to add, so we can skip it.
-		if len(values) == 0 {
-			continue
-		}
-
-		addColumn(values...)
+		columns[columnIndex] = append(columns[columnIndex], value)
 	}
 
-	return parquet.Row(columns), nil
+	if tracer.Enabled() {
+		logger := zlog.With(zap.String("path", string(message.Descriptor().FullName())))
+		for columnIndex, columnValues := range columns {
+			for i, value := range columnValues {
+				logger.Debug("column value",
+					zap.Int("column_index", columnIndex),
+					zap.Int("value_index", i),
+					zap.Int("repetition_level", value.RepetitionLevel()),
+					zap.Int("definition_level", value.DefinitionLevel()),
+					zap.Bool("is_null", value.IsNull()),
+				)
+			}
+		}
+	}
+
+	return parquet.MakeRow(columns...), nil
 }
 
-func protoMessageToValues(recursionCtx *recursionContext, message protoreflect.Message) (out []parquet.Value, err error) {
+func protoMessageToValues(recursionCtx *recursionContext, message protoreflect.Message, baseColumnIndex int) (out []parquet.Value, err error) {
 	if tracer.Enabled() {
 		logger := zlog.With(zap.String("path", recursionCtx.Path()))
-		logger.Debug("processing message")
+		logger.Debug("processing message", zap.Int("base_column_index", baseColumnIndex))
 		defer func() { logger.Debug("message processed", zap.Int("value_count", len(out))) }()
 	}
 
-	messageDesc := message.Descriptor()
-	fields := messageDesc.Fields()
+	fields := message.Descriptor().Fields()
+	columnOffset := 0
 
-	for i := range fields.Len() {
-		values, err := protoFieldToValues(recursionCtx, message, fields.Get(i))
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		if IsFieldIgnored(field) {
+			continue
+		}
+
+		fieldBase := baseColumnIndex + columnOffset
+		values, err := protoFieldToValues(recursionCtx, message, field, fieldBase)
 		if err != nil {
 			return nil, fmt.Errorf("message: %w", err)
 		}
 
-		if values != nil {
+		if len(values) > 0 {
 			out = append(out, values...)
 		}
+		columnOffset += fieldLeafColumnCount(field)
 	}
 
 	return out, nil
 }
 
-func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Message, field protoreflect.FieldDescriptor) (out []parquet.Value, err error) {
+func messageLeafColumnCount(desc protoreflect.MessageDescriptor) int {
+	total := 0
+	for field := range protox.WalkMessageFields(desc, zlog, tracer, IsFieldIgnored) {
+		if isLeafField(field) {
+			total++
+		}
+	}
+
+	return total
+}
+
+func fieldLeafColumnCount(field protoreflect.FieldDescriptor) int {
+	switch {
+	case IsFieldIgnored(field):
+		return 0
+	case isLeafField(field):
+		return 1
+	}
+
+	return messageLeafColumnCount(field.Message())
+}
+
+func isLeafField(field protoreflect.FieldDescriptor) bool {
+	columnType, _ := GetFieldColumnType(field)
+
+	switch {
+	case columnType != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE:
+		return true
+	case protox.IsWellKnownTimestampField(field):
+		return true
+	case field.Kind() != protoreflect.MessageKind || protox.IsWellKnownGoogleField(field):
+		// FIXME: This is not really handled properly, will fail later
+		return true
+	}
+
+	return false
+}
+
+func forEachLeafColumnIndex(field protoreflect.FieldDescriptor, baseColumnIndex int, fn func(int)) {
+	if IsFieldIgnored(field) {
+		return
+	}
+
+	if columnType, ok := GetFieldColumnType(field); ok && columnType != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
+		fn(baseColumnIndex)
+		return
+	}
+
+	if protox.IsWellKnownTimestampField(field) || field.Kind() != protoreflect.MessageKind || protox.IsWellKnownGoogleField(field) {
+		fn(baseColumnIndex)
+		return
+	}
+
+	nested := field.Message().Fields()
+	offset := 0
+	for i := 0; i < nested.Len(); i++ {
+		nestedField := nested.Get(i)
+		if IsFieldIgnored(nestedField) {
+			continue
+		}
+		leafCount := fieldLeafColumnCount(nestedField)
+		if leafCount == 0 {
+			continue
+		}
+		forEachLeafColumnIndex(nestedField, baseColumnIndex+offset, fn)
+		offset += leafCount
+	}
+
+	if offset == 0 {
+		fn(baseColumnIndex)
+	}
+}
+
+func appendNullLeafValues(recursionCtx *recursionContext, field protoreflect.FieldDescriptor, baseColumnIndex int, out *[]parquet.Value) {
+	leafCount := fieldLeafColumnCount(field)
+	if leafCount == 0 {
+		return
+	}
+
+	forEachLeafColumnIndex(field, baseColumnIndex, func(columnIndex int) {
+		*out = append(*out, recursionCtx.NullValue(columnIndex))
+	})
+}
+
+func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Message, field protoreflect.FieldDescriptor, baseColumnIndex int) (out []parquet.Value, err error) {
 	if tracer.Enabled() {
 		logger := zlog.With(
 			zap.String("path", recursionCtx.FieldPath(field)),
@@ -109,6 +203,7 @@ func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Mes
 			zap.Bool("is_list", field.IsList()),
 			zap.Bool("is_optional", field.HasOptionalKeyword()),
 			zap.Bool("is_nested_message", field.Kind() == protoreflect.MessageKind && !protox.IsWellKnownGoogleField(field)),
+			zap.Int("base_column_index", baseColumnIndex),
 		)
 		defer func() { logger.Debug("field processed", zap.Int("value_count", len(out))) }()
 	}
@@ -117,35 +212,35 @@ func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Mes
 		return nil, nil
 	}
 
-	value := message.Get(field)
-
-	// This handles custom column types like `string amount = 1 [(parquet.column) = {type: UINT256}];`.
-	// Those today are always leaf fields, so we can safely convert them to a column value directly.
-	if columnType, found := GetFieldColumnType(field); found && columnType != parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
-		value, err := protoValueToColumnTypeValue(columnType, field, value)
-		if err != nil {
-			return nil, fmt.Errorf("column type to value: %w", err)
-		}
-
-		return []parquet.Value{value}, nil
+	columnType, hasColumnType := GetFieldColumnType(field)
+	if hasColumnType && columnType == parquetpb.ColumnType_UNSPECIFIED_COLUMN_TYPE {
+		hasColumnType = false
 	}
 
+	fieldValue := message.Get(field)
+
 	if field.IsList() {
-		fieldList := value.List()
+		fieldList := fieldValue.List()
 
 		if fieldList.Len() == 0 {
-			return []parquet.Value{recursionCtx.NullValue()}, nil
+			appendNullLeafValues(recursionCtx, field, baseColumnIndex, &out)
+			return out, nil
 		}
 
-		out := make([]parquet.Value, 0, fieldList.Len())
 		recursionCtx.StartRepeated(fieldList.Len())
+		perElementColumns := fieldLeafColumnCount(field)
+		if perElementColumns <= 0 {
+			perElementColumns = 1
+		}
 
-		for i := range fieldList.Len() {
-			if field.Kind() == protoreflect.MessageKind && !protox.IsWellKnownGoogleField(field) {
+		out = make([]parquet.Value, 0, fieldList.Len()*perElementColumns)
+
+		for i := 0; i < fieldList.Len(); i++ {
+			if field.Kind() == protoreflect.MessageKind && !protox.IsWellKnownGoogleField(field) && !protox.IsWellKnownTimestampField(field) {
 				nestedMessage := fieldList.Get(i).Message()
 
 				recursionCtx.EnterRepeatedNested(fmt.Sprintf("%s[%d]", field.Name(), i), nestedMessage)
-				values, err := protoMessageToValues(recursionCtx, nestedMessage)
+				values, err := protoMessageToValues(recursionCtx, nestedMessage, baseColumnIndex)
 				recursionCtx.ExitRepeatedNested()
 
 				if err != nil {
@@ -154,12 +249,24 @@ func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Mes
 
 				out = append(out, values...)
 			} else {
-				sliceValue, err := protoLeafToValue(field, fieldList.Get(i), recursionCtx)
-				if err != nil {
-					return nil, fmt.Errorf("list leaf type @ index %d: %w", i, err)
-				}
+				element := fieldList.Get(i)
+				var value parquet.Value
+				if hasColumnType {
+					// This handles custom column types like `string amount = 1 [(parquet.column) = {type: UINT256}];`.
+					// Those today are always leaf fields, so we can safely convert them to a column value directly.
 
-				out = append(out, sliceValue)
+					value, err = protoValueToColumnTypeValue(columnType, field, element)
+					if err != nil {
+						return nil, fmt.Errorf("list column type @ index %d: %w", i, err)
+					}
+					out = append(out, recursionCtx.Level(value, baseColumnIndex))
+				} else {
+					value, err = protoLeafToValue(field, element, recursionCtx, baseColumnIndex)
+					if err != nil {
+						return nil, fmt.Errorf("list leaf type @ index %d: %w", i, err)
+					}
+					out = append(out, value)
+				}
 			}
 
 			recursionCtx.RepeatedIterationCompleted(i)
@@ -168,37 +275,26 @@ func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Mes
 		return out, nil
 	}
 
-	// Optional field behaves differently, around the definition level, when the field is actually
-	// set or not present at all than a regular required field. If a field is optional, is definition level
-	// is 1 when the field is present, and 0 when it's not (true only for non-nested fields, nested fields
-	// can go higher than 1).
-	//
-	// Failing to adjust the definition level correctly when the field is optional but present leads to
-	// the data not being populated correctly.
-	//
-	// FIXME: In presence of nested optional fields of type message, what is the order in which optional
-	// should be treated compared to nested fields and repeated fields?
 	if field.HasOptionalKeyword() {
 		if !message.Has(field) {
-			return []parquet.Value{recursionCtx.NullValue()}, nil
+			appendNullLeafValues(recursionCtx, field, baseColumnIndex, &out)
+			return out, nil
 		}
 
 		recursionCtx.EnterOptional()
-		leafValue, err := protoLeafToValue(field, value, recursionCtx)
-		recursionCtx.ExitOptional()
-
-		if err != nil {
-			return nil, fmt.Errorf("optional leaf to value: %w", err)
-		}
-
-		return []parquet.Value{leafValue}, nil
+		defer recursionCtx.ExitOptional()
 	}
 
-	if field.Kind() == protoreflect.MessageKind && !protox.IsWellKnownGoogleField(field) {
-		nestedMessage := value.Message()
+	if field.Kind() == protoreflect.MessageKind && !protox.IsWellKnownGoogleField(field) && !protox.IsWellKnownTimestampField(field) {
+		if !message.Has(field) {
+			appendNullLeafValues(recursionCtx, field, baseColumnIndex, &out)
+			return out, nil
+		}
+
+		nestedMessage := fieldValue.Message()
 
 		recursionCtx.EnterNested(string(field.Name()), nestedMessage)
-		nestedRows, err := protoMessageToValues(recursionCtx, nestedMessage)
+		nestedRows, err := protoMessageToValues(recursionCtx, nestedMessage, baseColumnIndex)
 		recursionCtx.ExitNested()
 
 		if err != nil {
@@ -208,7 +304,16 @@ func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Mes
 		return nestedRows, nil
 	}
 
-	leafValue, err := protoLeafToValue(field, value, recursionCtx)
+	if hasColumnType {
+		value, err := protoValueToColumnTypeValue(columnType, field, fieldValue)
+		if err != nil {
+			return nil, fmt.Errorf("column type to value: %w", err)
+		}
+
+		return []parquet.Value{recursionCtx.Level(value, baseColumnIndex)}, nil
+	}
+
+	leafValue, err := protoLeafToValue(field, fieldValue, recursionCtx, baseColumnIndex)
 	if err != nil {
 		return nil, fmt.Errorf("leaf to value: %w", err)
 	}
@@ -220,17 +325,16 @@ func protoFieldToValues(recursionCtx *recursionContext, message protoreflect.Mes
 // of a parquet.Value. It's provided by the [parentStack] struct when recursing into nested
 // fields and repeated fields.
 type valueLeveler interface {
-	// Level returns the value with the correct repetition and definition levels set.
-	Level(value parquet.Value) parquet.Value
+	// Level returns the value with the correct repetition and definition levels set for a specific column index.
+	Level(value parquet.Value, columnIndex int) parquet.Value
 
-	// NullValue returns a null value with the correct repetition and definition levels set.
-	NullValue() parquet.Value
+	// NullValue returns a null value with the correct repetition and definition levels set for a specific column index.
+	NullValue(columnIndex int) parquet.Value
 }
 
-func protoLeafToValue(field protoreflect.FieldDescriptor, value protoreflect.Value, leveler valueLeveler) (out parquet.Value, err error) {
+func protoLeafToValue(field protoreflect.FieldDescriptor, value protoreflect.Value, leveler valueLeveler, columnIndex int) (out parquet.Value, err error) {
 	defer func() {
-		// It's safe to call Level in all cases even if there is an error
-		out = leveler.Level(out)
+		out = leveler.Level(out, columnIndex)
 	}()
 
 	switch field.Kind() {

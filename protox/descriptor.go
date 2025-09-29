@@ -3,6 +3,7 @@ package protox
 import (
 	"errors"
 	"fmt"
+	"iter"
 
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
@@ -147,4 +148,52 @@ func WalkMessageDescriptors(root protoreflect.MessageDescriptor, logger *zap.Log
 	// The root itself must be visited as it might have a table extension making it a table
 	onMessageDescriptor(root)
 	inner(root)
+}
+
+// WalkMessageFields walks through all fields in a message descriptor recursively, yielding each field
+// encountered during the traversal. This is useful for operations that need to process all fields
+// in a message hierarchy, such as calculating leaf column counts or processing field values.
+//
+// The function performs a depth-first traversal of the message structure:
+// - For each field in the current message, it yields the field
+// - If the field is a message kind and not a well-known Google type, it recursively walks the nested message fields
+// - The traversal respects field filtering (fields that should be ignored are skipped)
+//
+// Parameters:
+//   - root: The message descriptor to start walking from
+//   - logger: Logger for debug output (can be nil)
+//   - tracer: Tracer for conditional debug logging (can be nil)
+//   - fieldFilter: Optional function to determine if a field should be ignored (can be nil)
+//
+// Returns an iterator that yields protoreflect.FieldDescriptor for each field encountered.
+func WalkMessageFields(root protoreflect.MessageDescriptor, logger *zap.Logger, tracer logging.Tracer, fieldFilter func(protoreflect.FieldDescriptor) bool) iter.Seq[protoreflect.FieldDescriptor] {
+	return func(yield func(protoreflect.FieldDescriptor) bool) {
+		var walkFields func(protoreflect.MessageDescriptor) bool
+		walkFields = func(desc protoreflect.MessageDescriptor) bool {
+			fields := desc.Fields()
+			for i := 0; i < fields.Len(); i++ {
+				field := fields.Get(i)
+
+				// Apply field filter if provided
+				if fieldFilter != nil && fieldFilter(field) {
+					continue
+				}
+
+				// Yield the current field
+				if !yield(field) {
+					return false
+				}
+
+				// If this is a message field and not a well-known type, recurse into it
+				if field.Kind() == protoreflect.MessageKind && !IsWellKnownGoogleField(field) {
+					if !walkFields(field.Message()) {
+						return false
+					}
+				}
+			}
+			return true
+		}
+
+		walkFields(root)
+	}
 }
