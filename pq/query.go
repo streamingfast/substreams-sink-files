@@ -11,12 +11,22 @@ import (
 func (q *Query) Resolve(root []byte, descriptor *desc.MessageDescriptor) (out []*dynamic.Message, err error) {
 	zlog.Debug("resolving query", zap.String("message_type", descriptor.GetFullyQualifiedName()))
 
+	// Handle root-level query case (single element: current access)
+	if len(q.Elements) == 1 && q.Elements[0].Kind() == ExpressionKindCurrent {
+		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(descriptor)
+		if err := dynMsg.Unmarshal(root); err != nil {
+			return nil, fmt.Errorf("unmarshal dynamic message: %w", err)
+		}
+
+		return []*dynamic.Message{dynMsg}, nil
+	}
+
 	if len(q.Elements) != 3 {
-		return nil, fmt.Errorf("only accepting query of 3 elements, got %d", len(q.Elements))
+		return nil, fmt.Errorf("only accepting query of 1 element (root query) or 3 elements, got %d", len(q.Elements))
 	}
 
 	if q.Elements[0].Kind() != ExpressionKindCurrent || q.Elements[1].Kind() != ExpressionKindField || q.Elements[2].Kind() != ExpressionKindArray {
-		return nil, fmt.Errorf("only accepting query in the form '.<fieldName>[]'")
+		return nil, fmt.Errorf("only accepting query in the form '.' or '.<fieldName>[]'")
 	}
 
 	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(descriptor)
