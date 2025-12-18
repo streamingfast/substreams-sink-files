@@ -15,6 +15,12 @@ func TestParse(t *testing.T) {
 		assertion require.ErrorAssertionFunc
 	}{
 		{
+			"root query",
+			".",
+			&Query{[]Expression{&CurrentAccess{}}},
+			require.NoError,
+		},
+		{
 			"current with field with array",
 			".fieldName[]",
 			&Query{[]Expression{&CurrentAccess{}, &FieldAccess{Name: "fieldName"}, &ArrayAccess{}}},

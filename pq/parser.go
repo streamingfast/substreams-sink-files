@@ -24,6 +24,13 @@ func Parse(in string) (*Query, error) {
 
 	exprs := []Expression{&CurrentAccess{}}
 
+	// Special case for root-level query "."
+	if in == "." {
+		return &Query{
+			Elements: exprs,
+		}, nil
+	}
+
 	fieldName := fieldRegex.FindString(in)
 	if fieldName == "" {
 		return nil, newParserError(in, "query must have field name after accessor '.'")

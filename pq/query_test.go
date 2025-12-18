@@ -112,3 +112,73 @@ func TestQuery_Resolve(t *testing.T) {
 		})
 	}
 }
+
+func TestQuery_ResolveSingleTransfer(t *testing.T) {
+	// Helper function to create a single Transfer message
+	createSingleTransferData := func(transferValue uint64) ([]byte, *desc.MessageDescriptor, error) {
+		// Create Transfer message descriptor
+		transferBuilder := builder.NewMessage("Transfer")
+		transferBuilder.AddField(builder.NewField("value", builder.FieldTypeUInt64()).SetNumber(1))
+		transferDesc, err := transferBuilder.Build()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Create dynamic message factory
+		factory := dynamic.NewMessageFactoryWithDefaults()
+
+		// Create single transfer message
+		transferMsg := factory.NewDynamicMessage(transferDesc)
+		transferMsg.SetFieldByNumber(1, transferValue) // value field
+
+		// Marshal to bytes
+		bytes, err := transferMsg.Marshal()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return bytes, transferDesc, nil
+	}
+
+	type testCase struct {
+		name      string
+		query     string
+		wantCount int
+		testValue uint64
+		assertion require.ErrorAssertionFunc
+	}
+	tests := []testCase{
+		{
+			"single transfer root query",
+			".",
+			1,
+			42,
+			require.NoError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, err := Parse(tt.query)
+			require.NoError(t, err)
+
+			bytes, descriptor, err := createSingleTransferData(tt.testValue)
+			require.NoError(t, err)
+
+			got, err := query.Resolve(bytes, descriptor)
+			tt.assertion(t, err)
+
+			require.Len(t, got, tt.wantCount)
+
+			// For root query, verify we got the transfer message back
+			if tt.query == "." {
+				require.NotNil(t, got[0], "transfer message should not be nil")
+				// Verify it's a dynamic message by checking we can get field value
+				value, err := got[0].TryGetFieldByNumber(1) // value field
+				require.NoError(t, err)
+				require.NotNil(t, value, "value field should not be nil")
+				require.Equal(t, tt.testValue, value.(uint64), "value should match")
+			}
+		})
+	}
+}
