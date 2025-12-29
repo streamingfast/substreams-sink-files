@@ -47,7 +47,7 @@ func toolsParquetSchemaE(cmd *cobra.Command, args []string) error {
 	sinker, err := sink.New(sink.SubstreamsModeProduction, true, pkg, module, outputModuleHash, nil, zlog, tracer)
 	cli.NoError(err, "New sinker failed")
 
-	descriptor, err := outputProtoreflectMessageDescriptor(sinker)
+	descriptor, err := outputMessageDescriptor(sinker)
 	cli.NoError(err, "Failed to extract message descriptor from output module")
 
 	parquetWriterOptions, err := writer.NewParquetWriterOptions(readCommonParquetFlags(cmd).AsParquetWriterOptions())

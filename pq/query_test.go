@@ -3,49 +3,92 @@ package pq
 import (
 	"testing"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/builder"
-	"github.com/jhump/protoreflect/dynamic"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 func TestQuery_Resolve(t *testing.T) {
-	// Helper function to create test data using completely independent descriptors
-	createTransfersData := func(transferValues ...uint64) ([]byte, *desc.MessageDescriptor, error) {
-		// Create completely independent descriptors using builder
-		// This avoids any association with the compiled Go types
-
-		// Create Transfer message descriptor
-		transferBuilder := builder.NewMessage("Transfer")
-		transferBuilder.AddField(builder.NewField("value", builder.FieldTypeUInt64()).SetNumber(1))
-		transferDesc, err := transferBuilder.Build()
-		if err != nil {
-			return nil, nil, err
+	// Helper function to create test data using Google's protobuf descriptors
+	createTransfersData := func(transferValues ...uint64) ([]byte, protoreflect.MessageDescriptor, error) {
+		// Create Transfer message descriptor using descriptorpb
+		transferMsgDesc := &descriptorpb.DescriptorProto{
+			Name: proto.String("Transfer"),
+			Field: []*descriptorpb.FieldDescriptorProto{
+				{
+					Name:   proto.String("value"),
+					Number: proto.Int32(1),
+					Type:   descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(),
+				},
+			},
 		}
 
 		// Create Transfers message descriptor
-		transfersBuilder := builder.NewMessage("Transfers")
-		transfersBuilder.AddField(builder.NewField("transfers", builder.FieldTypeImportedMessage(transferDesc)).SetRepeated().SetNumber(1))
-		transfersDesc, err := transfersBuilder.Build()
+		transfersMsgDesc := &descriptorpb.DescriptorProto{
+			Name: proto.String("Transfers"),
+			Field: []*descriptorpb.FieldDescriptorProto{
+				{
+					Name:     proto.String("transfers"),
+					Number:   proto.Int32(1),
+					Type:     descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum(),
+					TypeName: proto.String(".Transfer"),
+					Label:    descriptorpb.FieldDescriptorProto_LABEL_REPEATED.Enum(),
+				},
+			},
+		}
+
+		// Create file descriptor
+		fileDesc := &descriptorpb.FileDescriptorProto{
+			Name: proto.String("test.proto"),
+			MessageType: []*descriptorpb.DescriptorProto{
+				transferMsgDesc,
+				transfersMsgDesc,
+			},
+		}
+
+		// Create file descriptor set
+		fileDescSet := &descriptorpb.FileDescriptorSet{
+			File: []*descriptorpb.FileDescriptorProto{fileDesc},
+		}
+
+		// Create protoreflect files
+		files, err := protodesc.NewFiles(fileDescSet)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// Create dynamic message factory
-		factory := dynamic.NewMessageFactoryWithDefaults()
+		// Get the message descriptors
+		transfersDescriptor, err := files.FindDescriptorByName("Transfers")
+		if err != nil {
+			return nil, nil, err
+		}
+		transfersDesc := transfersDescriptor.(protoreflect.MessageDescriptor)
+
+		transferDescriptor, err := files.FindDescriptorByName("Transfer")
+		if err != nil {
+			return nil, nil, err
+		}
+		transferDesc := transferDescriptor.(protoreflect.MessageDescriptor)
 
 		// Create dynamic transfers message
-		transfersMsg := factory.NewDynamicMessage(transfersDesc)
+		transfersMsg := dynamicpb.NewMessage(transfersDesc)
 
 		// Create and add transfer messages
+		transfersField := transfersDesc.Fields().ByName("transfers")
+		transfersList := transfersMsg.Mutable(transfersField).List()
+
 		for _, value := range transferValues {
-			transferMsg := factory.NewDynamicMessage(transferDesc)
-			transferMsg.SetFieldByNumber(1, value)                // value field
-			transfersMsg.AddRepeatedFieldByNumber(1, transferMsg) // transfers field
+			transferMsg := dynamicpb.NewMessage(transferDesc)
+			valueField := transferDesc.Fields().ByName("value")
+			transferMsg.Set(valueField, protoreflect.ValueOfUint64(value))
+			transfersList.Append(protoreflect.ValueOfMessage(transferMsg))
 		}
 
 		// Marshal to bytes
-		bytes, err := transfersMsg.Marshal()
+		bytes, err := proto.Marshal(transfersMsg)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -97,16 +140,21 @@ func TestQuery_Resolve(t *testing.T) {
 
 			require.Len(t, got, tt.wantCount)
 
-			// Verify that we got dynamic messages back
+			// Verify that we got dynamicpb messages back
 			for j, msg := range got {
 				require.NotNil(t, msg, "message at index %d should not be nil", j)
-				// Verify it's a dynamic message by checking we can get field value
+				require.IsType(t, &dynamicpb.Message{}, msg, "should be a dynamicpb.Message")
+
+				// Verify we can get field value for non-empty cases
 				if tt.wantCount > 0 {
-					value, err := msg.TryGetFieldByNumber(1) // value field
-					require.NoError(t, err)
-					require.NotNil(t, value, "value field should not be nil at index %d", j)
-					// Verify the value matches what we put in
-					require.Equal(t, tt.testData[j], value.(uint64), "value should match at index %d", j)
+					// Get the message descriptor to find the field
+					msgDesc := msg.Descriptor()
+					valueField := msgDesc.Fields().ByNumber(1) // value field
+					require.NotNil(t, valueField, "value field descriptor should exist")
+
+					// Get the field value
+					value := msg.Get(valueField).Uint()
+					require.Equal(t, tt.testData[j], value, "value should match at index %d", j)
 				}
 			}
 		})
@@ -115,24 +163,52 @@ func TestQuery_Resolve(t *testing.T) {
 
 func TestQuery_ResolveSingleTransfer(t *testing.T) {
 	// Helper function to create a single Transfer message
-	createSingleTransferData := func(transferValue uint64) ([]byte, *desc.MessageDescriptor, error) {
+	createSingleTransferData := func(transferValue uint64) ([]byte, protoreflect.MessageDescriptor, error) {
 		// Create Transfer message descriptor
-		transferBuilder := builder.NewMessage("Transfer")
-		transferBuilder.AddField(builder.NewField("value", builder.FieldTypeUInt64()).SetNumber(1))
-		transferDesc, err := transferBuilder.Build()
+		transferMsgDesc := &descriptorpb.DescriptorProto{
+			Name: proto.String("Transfer"),
+			Field: []*descriptorpb.FieldDescriptorProto{
+				{
+					Name:   proto.String("value"),
+					Number: proto.Int32(1),
+					Type:   descriptorpb.FieldDescriptorProto_TYPE_UINT64.Enum(),
+				},
+			},
+		}
+
+		// Create file descriptor
+		fileDesc := &descriptorpb.FileDescriptorProto{
+			Name: proto.String("test.proto"),
+			MessageType: []*descriptorpb.DescriptorProto{
+				transferMsgDesc,
+			},
+		}
+
+		// Create file descriptor set
+		fileDescSet := &descriptorpb.FileDescriptorSet{
+			File: []*descriptorpb.FileDescriptorProto{fileDesc},
+		}
+
+		// Create protoreflect files
+		files, err := protodesc.NewFiles(fileDescSet)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		// Create dynamic message factory
-		factory := dynamic.NewMessageFactoryWithDefaults()
+		// Get the message descriptor
+		transferDescriptor, err := files.FindDescriptorByName("Transfer")
+		if err != nil {
+			return nil, nil, err
+		}
+		transferDesc := transferDescriptor.(protoreflect.MessageDescriptor)
 
 		// Create single transfer message
-		transferMsg := factory.NewDynamicMessage(transferDesc)
-		transferMsg.SetFieldByNumber(1, transferValue) // value field
+		transferMsg := dynamicpb.NewMessage(transferDesc)
+		valueField := transferDesc.Fields().ByName("value")
+		transferMsg.Set(valueField, protoreflect.ValueOfUint64(transferValue))
 
 		// Marshal to bytes
-		bytes, err := transferMsg.Marshal()
+		bytes, err := proto.Marshal(transferMsg)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -173,11 +249,15 @@ func TestQuery_ResolveSingleTransfer(t *testing.T) {
 			// For root query, verify we got the transfer message back
 			if tt.query == "." {
 				require.NotNil(t, got[0], "transfer message should not be nil")
-				// Verify it's a dynamic message by checking we can get field value
-				value, err := got[0].TryGetFieldByNumber(1) // value field
-				require.NoError(t, err)
-				require.NotNil(t, value, "value field should not be nil")
-				require.Equal(t, tt.testValue, value.(uint64), "value should match")
+				require.IsType(t, &dynamicpb.Message{}, got[0], "should be a dynamicpb.Message")
+
+				// Verify we can get field value
+				msgDesc := got[0].Descriptor()
+				valueField := msgDesc.Fields().ByNumber(1) // value field
+				require.NotNil(t, valueField, "value field descriptor should exist")
+
+				value := got[0].Get(valueField).Uint()
+				require.Equal(t, tt.testValue, value, "value should match")
 			}
 		})
 	}

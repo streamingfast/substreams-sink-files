@@ -1,23 +1,22 @@
 package encoder
 
 import (
-	"encoding/json"
 	"fmt"
 
-	// We use the deprecated version on purpose!
-	"github.com/golang/protobuf/proto"
-	"github.com/jhump/protoreflect/desc"
 	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/pq"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 type ProtoToJson struct {
 	querier          *pq.Query
-	outputModuleDesc *desc.MessageDescriptor
+	outputModuleDesc protoreflect.MessageDescriptor
 }
 
-func NewProtoToJson(fiedPath string, outputModuleDesc *desc.MessageDescriptor) (*ProtoToJson, error) {
+func NewProtoToJson(fiedPath string, outputModuleDesc protoreflect.MessageDescriptor) (*ProtoToJson, error) {
 	entitiesQuery, err := pq.Parse(fiedPath)
 	if err != nil {
 		return nil, fmt.Errorf("parse entities path %q: %w", fiedPath, err)
@@ -32,7 +31,7 @@ func (p *ProtoToJson) EncodeTo(output *pbsubstreamsrpc.MapModuleOutput, writer w
 		return fmt.Errorf("failed to resolve entities query: %w", err)
 	}
 	for idx, entity := range entities {
-		err := protoToJson(proto.Message(entity), writer)
+		err := protoToJson(entity, writer)
 		if err != nil {
 			return fmt.Errorf("encode entity at index %d: %w", idx, err)
 		}
@@ -41,10 +40,19 @@ func (p *ProtoToJson) EncodeTo(output *pbsubstreamsrpc.MapModuleOutput, writer w
 	return nil
 }
 
-func protoToJson(message proto.Message, writer writer.Writer) error {
-	// The `NewEncoder(writer).Encode(message)` automatically adds "\n" at the end
-	if err := json.NewEncoder(writer).Encode(message); err != nil {
-		return fmt.Errorf("json encoder: %w", err)
+func protoToJson(message *dynamicpb.Message, writer writer.Writer) error {
+	// Directly use protojson.Marshal without any conversion
+	out, err := protojson.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("protojson marshal: %w", err)
+	}
+
+	// Write the JSON bytes followed by newline
+	if _, err := writer.Write(out); err != nil {
+		return fmt.Errorf("write json: %w", err)
+	}
+	if _, err := writer.Write([]byte("\n")); err != nil {
+		return fmt.Errorf("write newline: %w", err)
 	}
 
 	return nil
