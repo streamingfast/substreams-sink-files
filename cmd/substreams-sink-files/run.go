@@ -106,6 +106,28 @@ var SyncRunCmd = Command(syncRunE,
 			Default value for the buffer is 64 MiB.
 		`))
 
+		flags.Bool("date-partitioning", false, FlagMultiLineDescription(`
+			Enable date-based partitioning of output files. When enabled, files will be organized in date-based
+			directories based on the block timestamp.
+
+			Output structure becomes: <tableName>/<date>/<blockRange>.ext
+			Example: transfers/2024-01-15/0010000000-0010010000.jsonl
+
+			This is useful for organizing data by date and enabling date-based filtering and querying.
+		`))
+
+		flags.String("date-format", "2006-01-02", FlagMultiLineDescription(`
+			Date format to use for date-based partitioning directories. Uses Go time format.
+			
+			Common formats:
+			- "2006-01-02" (default): 2024-01-15
+			- "2006-01" : 2024-01 (monthly partitioning)
+			- "2006" : 2024 (yearly partitioning)
+			- "2006/01/02" : 2024/01/15 (nested directories)
+
+			Only used when --date-partitioning is enabled.
+		`))
+
 		addCommonParquetFlags(flags)
 	}),
 	ExamplePrefixed("substreams-sink-files run", `
@@ -142,6 +164,8 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	blocksPerFile := sflags.MustGetUint64(cmd, "file-block-count")
 	bufferMaxSize := sflags.MustGetUint64(cmd, "buffer-max-size")
 	encoderType := sflags.MustGetString(cmd, "encoder")
+	datePartitioning := sflags.MustGetBool(cmd, "date-partitioning")
+	dateFormat := sflags.MustGetString(cmd, "date-format")
 
 	zlog.Info("sink to files",
 		zap.String("file_output_path", fileOutputPath),
@@ -150,6 +174,8 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 		zap.String("state_store", stateStorePath),
 		zap.Uint64("blocks_per_file", blocksPerFile),
 		zap.Uint64("buffer_max_size", bufferMaxSize),
+		zap.Bool("date_partitioning", datePartitioning),
+		zap.String("date_format", dateFormat),
 	)
 
 	sinker, err := sink.NewFromViper(cmd,
@@ -192,7 +218,12 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 
 	switch {
 	case encoderType == "lines" || strings.HasPrefix(encoderType, "proto:") || strings.HasPrefix(encoderType, "protojson:"):
-		boundaryWriter = writer.NewBufferedIO(bufferMaxSize, fileWorkingDir, writer.FileTypeJSONL, zlog)
+		bufferedWriter := writer.NewBufferedIO(bufferMaxSize, fileWorkingDir, writer.FileTypeJSONL, zlog)
+
+		// Configure date partitioning directly on the BufferedIO
+		bufferedWriter.SetDatePartitioning(datePartitioning, dateFormat)
+		boundaryWriter = bufferedWriter
+
 		sinkEncoder, err = getEncoder(encoderType, sinker)
 		if err != nil {
 			return fmt.Errorf("failed to create encoder: %w", err)
@@ -211,9 +242,15 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("new parquet writer: %w", err)
 		}
 
+		// Configure date partitioning directly on the ParquetWriter
+		parquetWriter.SetDatePartitioning(datePartitioning, dateFormat)
 		boundaryWriter = parquetWriter
+
 		sinkEncoder = encoder.EncoderFunc(func(output *pbsubstreamsrpc.MapModuleOutput, _ writer.Writer) error {
-			return parquetWriter.EncodeMapModule(output)
+			if parquetWriter, ok := boundaryWriter.(*writer.ParquetWriter); ok {
+				return parquetWriter.EncodeMapModule(output)
+			}
+			return fmt.Errorf("unexpected writer type configuration")
 		})
 
 	default:
@@ -230,6 +267,9 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("new bundler: %w", err)
 	}
+
+	// Configure date partitioning on the bundler
+	bundler.SetDatePartitioning(datePartitioning, dateFormat)
 
 	app.SuperviseAndStart(substreamsfile.NewFileSinker(sinker, bundler, sinkEncoder, zlog, tracer))
 

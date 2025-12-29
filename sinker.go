@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/logging"
 	"github.com/streamingfast/shutter"
 	"github.com/streamingfast/substreams-sink-files/bundler"
+	"github.com/streamingfast/substreams-sink-files/bundler/writer"
 	"github.com/streamingfast/substreams-sink-files/encoder"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	sink "github.com/streamingfast/substreams/sink"
@@ -74,7 +75,18 @@ func (fs *FileSinker) Run(ctx context.Context) error {
 }
 
 func (fs *FileSinker) HandleBlockScopedData(ctx context.Context, data *pbsubstreamsrpc.BlockScopedData, isLive *bool, cursor *sink.Cursor) error {
-	if err := fs.bundler.Roll(ctx, cursor.Block().Num()); err != nil {
+	var blockTime time.Time
+
+	// Extract timestamp from block data and set it on timestamp-aware writers
+	if data.Clock != nil && data.Clock.Timestamp != nil {
+		blockTime = data.Clock.Timestamp.AsTime()
+		if timestampAware, ok := fs.bundler.Writer().(writer.TimestampAware); ok {
+			timestampAware.SetCurrentTimestamp(blockTime)
+		}
+	}
+
+	// Use date-aware rolling that can close boundaries early on date changes
+	if err := fs.bundler.RollWithDateCheck(ctx, cursor.Block().Num(), blockTime); err != nil {
 		return fmt.Errorf("failed to roll: %w", err)
 	}
 

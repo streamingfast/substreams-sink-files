@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/parquet-go/parquet-go"
 	"github.com/streamingfast/bstream"
@@ -22,6 +23,8 @@ import (
 )
 
 var _ Writer = (*ParquetWriter)(nil)
+var _ TimestampAware = (*ParquetWriter)(nil)
+var _ BoundaryAdjustable = (*ParquetWriter)(nil)
 
 // ParquetWriter implements our internal interface for writing Parquet data to files
 // directly.
@@ -34,6 +37,12 @@ type ParquetWriter struct {
 
 	activeRange           *bstream.Range
 	rowsBufferByTableName map[string]*parquet.RowBuffer[any]
+
+	// Date partitioning fields
+	currentTimestamp time.Time
+	dateFormat       string
+	datePartitioning bool
+	logger           *zap.Logger
 }
 
 func NewParquetWriter(descriptor protoreflect.MessageDescriptor, logger *zap.Logger, tracer logging.Tracer, opts ...ParquetWriterOption) (*ParquetWriter, error) {
@@ -62,6 +71,7 @@ func NewParquetWriter(descriptor protoreflect.MessageDescriptor, logger *zap.Log
 		tables:       tables,
 		tablesByName: tablesByName,
 		rowExtractor: rowExtractor,
+		logger:       logger,
 	}, nil
 }
 
@@ -83,7 +93,7 @@ func (p *ParquetWriter) CloseBoundary(ctx context.Context) (Uploadeable, error) 
 			panic(fmt.Errorf("no rows found for table %q, should have been created", table.Schema.Name()))
 		}
 
-		uploadables[i] = uploadTableFile(table.Schema, rows, p.activeRange)
+		uploadables[i] = p.uploadTableFile(table.Schema, rows, p.activeRange)
 	}
 
 	return UploadeableFunc(func(ctx context.Context, store dstore.Store) (out string, err error) {
@@ -129,8 +139,9 @@ func (p *ParquetWriter) CloseBoundary(ctx context.Context) (Uploadeable, error) 
 	}), nil
 }
 
-func uploadTableFile(schema *parquet.Schema, rows *parquet.RowBuffer[any], activeRange *bstream.Range) Uploadeable {
-	filename := fmt.Sprintf(path.Join(schema.Name(), "%010d-%010d.parquet"), activeRange.StartBlock(), *activeRange.EndBlock())
+func (p *ParquetWriter) uploadTableFile(schema *parquet.Schema, rows *parquet.RowBuffer[any], activeRange *bstream.Range) Uploadeable {
+	// Generate filename with optional date partitioning
+	filename := p.generateFilename(schema.Name(), activeRange)
 
 	return UploadeableFunc(func(ctx context.Context, store dstore.Store) (string, error) {
 		reader, writer := io.Pipe()
@@ -162,6 +173,17 @@ func uploadTableFile(schema *parquet.Schema, rows *parquet.RowBuffer[any], activ
 
 		return filename, nil
 	})
+}
+
+func (p *ParquetWriter) generateFilename(tableName string, activeRange *bstream.Range) string {
+	baseFilename := fmt.Sprintf("%010d-%010d.parquet", activeRange.StartBlock(), *activeRange.EndBlock())
+
+	if p.datePartitioning && !p.currentTimestamp.IsZero() {
+		dateDir := p.currentTimestamp.UTC().Format(p.dateFormat)
+		return path.Join(tableName, dateDir, baseFilename)
+	}
+
+	return path.Join(tableName, baseFilename)
 }
 
 // StartBoundary implements Writer.
@@ -236,4 +258,20 @@ func (*ParquetWriter) Write(p []byte) (n int, err error) {
 	// is too much tied with writing low level bytes. As with Parquet, we have
 	// an intermediate step.
 	panic("shouldn't be called in ParquetWriter")
+}
+
+// SetCurrentTimestamp implements TimestampAware interface
+func (p *ParquetWriter) SetCurrentTimestamp(t time.Time) {
+	p.currentTimestamp = t
+}
+
+// SetDatePartitioning configures date-based partitioning
+func (p *ParquetWriter) SetDatePartitioning(enabled bool, format string) {
+	p.datePartitioning = enabled
+	p.dateFormat = format
+}
+
+// AdjustBoundary implements BoundaryAdjustable interface
+func (p *ParquetWriter) AdjustBoundary(newRange *bstream.Range) {
+	p.activeRange = newRange
 }
