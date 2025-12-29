@@ -7,8 +7,8 @@ import (
 
 	"github.com/holiman/uint256"
 	"github.com/parquet-go/parquet-go"
-	parquetpb "github.com/streamingfast/substreams-sink-files/pb/parquet"
-	"github.com/streamingfast/substreams-sink-files/protox"
+	parquetpb "github.com/streamingfast/substreams-sink-files/v2/pb/parquet"
+	"github.com/streamingfast/substreams-sink-files/v2/protox"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )

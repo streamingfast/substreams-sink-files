@@ -3,8 +3,8 @@ package tests
 import (
 	"testing"
 
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-	pbtesting "github.com/streamingfast/substreams-sink-files/internal/pb/tests"
+	"github.com/streamingfast/substreams-sink-files/v2/bundler/writer"
+	pbtesting "github.com/streamingfast/substreams-sink-files/v2/internal/pb/tests"
 	"google.golang.org/protobuf/proto"
 )
 

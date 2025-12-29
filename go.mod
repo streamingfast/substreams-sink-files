@@ -1,4 +1,4 @@
-module github.com/streamingfast/substreams-sink-files
+module github.com/streamingfast/substreams-sink-files/v2
 
 go 1.24.2
 

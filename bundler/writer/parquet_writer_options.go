@@ -6,7 +6,7 @@ import (
 
 	"github.com/bobg/go-generics/v2/maps"
 	"github.com/bobg/go-generics/v2/slices"
-	pbparquet "github.com/streamingfast/substreams-sink-files/pb/parquet"
+	pbparquet "github.com/streamingfast/substreams-sink-files/v2/pb/parquet"
 )
 
 // ParquetWriterOptions holds the configuration options for the Parquet writer.

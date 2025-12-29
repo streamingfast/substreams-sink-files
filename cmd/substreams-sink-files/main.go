@@ -16,7 +16,7 @@ import (
 // Version value, injected via go build `ldflags` at build time
 var version = "dev"
 
-var zlog, tracer = logging.RootLogger("substreams-sink-files", "github.com/streamingfast/substreams-sink-files/cmd/substreams-sink-files")
+var zlog, tracer = logging.RootLogger("substreams-sink-files", "github.com/streamingfast/substreams-sink-files/v2/cmd/substreams-sink-files")
 
 func init() {
 	logging.InstantiateLoggers(logging.WithDefaultLevel(zap.InfoLevel))

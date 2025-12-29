@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/lithammer/dedent"
-	pbtesting "github.com/streamingfast/substreams-sink-files/internal/pb/tests"
+	pbtesting "github.com/streamingfast/substreams-sink-files/v2/internal/pb/tests"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )

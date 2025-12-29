@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-	pbsinkfiles "github.com/streamingfast/substreams-sink-files/pb/sf/substreams/sink/files/v1"
+	"github.com/streamingfast/substreams-sink-files/v2/bundler/writer"
+	pbsinkfiles "github.com/streamingfast/substreams-sink-files/v2/pb/sf/substreams/sink/files/v1"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/test-go/testify/require"

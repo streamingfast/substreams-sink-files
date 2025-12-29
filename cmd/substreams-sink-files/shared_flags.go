@@ -5,7 +5,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/cli"
 	"github.com/streamingfast/cli/sflags"
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
+	"github.com/streamingfast/substreams-sink-files/v2/bundler/writer"
 )
 
 // addCommonParquetFlags adds common flags for Parquet encoder. The list of flags added by this function are:

@@ -3,8 +3,8 @@ package encoder
 import (
 	"fmt"
 
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-	"github.com/streamingfast/substreams-sink-files/pq"
+	"github.com/streamingfast/substreams-sink-files/v2/bundler/writer"
+	"github.com/streamingfast/substreams-sink-files/v2/pq"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"

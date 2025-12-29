@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-	pbsinkfiles "github.com/streamingfast/substreams-sink-files/pb/sf/substreams/sink/files/v1"
+	"github.com/streamingfast/substreams-sink-files/v2/bundler/writer"
+	pbsinkfiles "github.com/streamingfast/substreams-sink-files/v2/pb/sf/substreams/sink/files/v1"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"google.golang.org/protobuf/proto"
 )

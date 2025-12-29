@@ -12,7 +12,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/substreams-sink-files/parquetx"
+	"github.com/streamingfast/substreams-sink-files/v2/parquetx"
 	pbsubstreamsrpc "github.com/streamingfast/substreams/pb/sf/substreams/rpc/v2"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"

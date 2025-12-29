@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/cli"
 	. "github.com/streamingfast/cli"
-	"github.com/streamingfast/substreams-sink-files/bundler/writer"
-	"github.com/streamingfast/substreams-sink-files/parquetx"
+	"github.com/streamingfast/substreams-sink-files/v2/bundler/writer"
+	"github.com/streamingfast/substreams-sink-files/v2/parquetx"
 	sink "github.com/streamingfast/substreams/sink"
 )
 
