@@ -5,16 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v3.0.1
-
-### **Breaking Changes**
-
-* `protojson:` and `proto` outputs now use the `google.golang.org/protobuf/encoding/protojson` library to ensure it follows the correct definition (https://protobuf.dev/programming-guides/json/)
-
-### Deprecation Warning
-
-* Using this package binary will soon be deprecated in favor of the `substreams sink parquet` and `substreams sink protojson` commands.
-
 ## v3.0.0
 
 ### **Breaking Changes**
@@ -28,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Added `--output-dir` (short: `-o`) for specifying output directory
 
 * **Dependency Migration**: Replaced `github.com/streamingfast/substreams-sink` with `github.com/streamingfast/substreams/sink` which normalizes command line arguments across all substreams sink tools.
+* **JSON encoding format changed**: `protojson:` and `proto` outputs now use the `google.golang.org/protobuf/encoding/protojson` library to ensure it follows the correct definition (https://protobuf.dev/programming-guides/json/)
+
+### Deprecation Warning
+
+* Using this package binary will soon be deprecated in favor of the `substreams sink parquet` and `substreams sink protojson` commands.
 
 ### Migration Examples
 
