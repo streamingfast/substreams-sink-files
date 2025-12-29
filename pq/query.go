@@ -3,22 +3,25 @@ package pq
 import (
 	"fmt"
 
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-func (q *Query) Resolve(root []byte, descriptor *desc.MessageDescriptor) (out []*dynamic.Message, err error) {
-	zlog.Debug("resolving query", zap.String("message_type", descriptor.GetFullyQualifiedName()))
+// Resolve resolves the query and returns dynamicpb.Message instances
+// This uses google.golang.org/protobuf for efficient JSON marshaling
+func (q *Query) Resolve(root []byte, descriptor protoreflect.MessageDescriptor) (out []*dynamicpb.Message, err error) {
+	zlog.Debug("resolving query", zap.String("message_type", string(descriptor.FullName())))
 
 	// Handle root-level query case (single element: current access)
 	if len(q.Elements) == 1 && q.Elements[0].Kind() == ExpressionKindCurrent {
-		dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(descriptor)
-		if err := dynMsg.Unmarshal(root); err != nil {
+		dynMsg := dynamicpb.NewMessage(descriptor)
+		if err := proto.Unmarshal(root, dynMsg); err != nil {
 			return nil, fmt.Errorf("unmarshal dynamic message: %w", err)
 		}
 
-		return []*dynamic.Message{dynMsg}, nil
+		return []*dynamicpb.Message{dynMsg}, nil
 	}
 
 	if len(q.Elements) != 3 {
@@ -29,56 +32,50 @@ func (q *Query) Resolve(root []byte, descriptor *desc.MessageDescriptor) (out []
 		return nil, fmt.Errorf("only accepting query in the form '.' or '.<fieldName>[]'")
 	}
 
-	dynMsg := dynamic.NewMessageFactoryWithDefaults().NewDynamicMessage(descriptor)
-	if err := dynMsg.Unmarshal(root); err != nil {
+	dynMsg := dynamicpb.NewMessage(descriptor)
+	if err := proto.Unmarshal(root, dynMsg); err != nil {
 		return nil, fmt.Errorf("unmarshal dynamic message: %w", err)
 	}
 
 	// Hard-coded for now
 	fieldName := q.Elements[1].(*FieldAccess).Name
 
-	fieldDesc := dynMsg.FindFieldDescriptorByName(fieldName)
+	fieldDesc := descriptor.Fields().ByName(protoreflect.Name(fieldName))
 	if fieldDesc == nil {
-		return nil, fmt.Errorf("field %q does not exist on proto of type %q", fieldName, descriptor.GetFullyQualifiedName())
+		return nil, fmt.Errorf("field %q does not exist on proto of type %q", fieldName, descriptor.FullName())
 	}
 
-	if !fieldDesc.IsRepeated() {
-		return nil, fmt.Errorf("field %q of type %q is not repeated while accessing array field", fieldName, fieldDesc.GetFullyQualifiedName())
+	if !fieldDesc.IsList() {
+		return nil, fmt.Errorf("field %q of type %q is not repeated while accessing array field", fieldName, fieldDesc.FullName())
 	}
 
 	if tracer.Enabled() {
 		zlog.Debug("resolved field",
-			zap.Int32("id", fieldDesc.GetNumber()),
-			zap.String("name", fieldDesc.GetFullyQualifiedName()),
-			zap.Stringer("type", fieldDesc.GetType()),
+			zap.Int32("id", int32(fieldDesc.Number())),
+			zap.String("name", string(fieldDesc.FullName())),
+			zap.Stringer("type", fieldDesc.Kind()),
 		)
 	}
 
-	count, err := dynMsg.TryFieldLength(fieldDesc)
-	if err != nil {
-		return nil, fmt.Errorf("get field %q of type %q length: %w", fieldName, fieldDesc.GetFullyQualifiedName(), err)
-	}
+	list := dynMsg.Get(fieldDesc).List()
+	count := list.Len()
 
 	if tracer.Enabled() {
-		zlog.Debug("resolved repeated field count", zap.String("name", fieldDesc.GetFullyQualifiedName()), zap.Int("count", count))
+		zlog.Debug("resolved repeated field count", zap.String("name", string(fieldDesc.FullName())), zap.Int("count", count))
 	}
 
 	if count == 0 {
 		return nil, nil
 	}
 
-	out = make([]*dynamic.Message, count)
+	out = make([]*dynamicpb.Message, count)
 	for i := 0; i < count; i++ {
-		value, err := dynMsg.TryGetRepeatedField(fieldDesc, i)
-		if err != nil {
-			return nil, fmt.Errorf("get field %q of type %q at index %d length: %w", fieldName, fieldDesc.GetFullyQualifiedName(), i, err)
-		}
-
-		out[i] = value.(*dynamic.Message)
+		value := list.Get(i).Message()
+		out[i] = value.Interface().(*dynamicpb.Message)
 	}
 
 	if tracer.Enabled() {
-		zlog.Debug("resolved repeated field values", zap.String("name", fieldDesc.GetFullyQualifiedName()), zap.Int("count", len(out)))
+		zlog.Debug("resolved repeated field values", zap.String("name", string(fieldDesc.FullName())), zap.Int("count", len(out)))
 	}
 
 	return out, nil

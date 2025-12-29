@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jhump/protoreflect/desc"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/streamingfast/cli"
@@ -202,7 +201,7 @@ func syncRunE(cmd *cobra.Command, args []string) error {
 	case encoderType == "parquet":
 		flagValues := readCommonParquetFlags(cmd)
 
-		msgDesc, err := outputProtoreflectMessageDescriptor(sinker)
+		msgDesc, err := outputMessageDescriptor(sinker)
 		if err != nil {
 			return fmt.Errorf("output module message descriptor: %w", err)
 		}
@@ -263,26 +262,7 @@ func getEncoder(encoderType string, sinker *sink.Sinker) (encoder.Encoder, error
 	return nil, fmt.Errorf("unknown encoder type %q", encoderType)
 }
 
-func outputMessageDescriptor(sinker *sink.Sinker) (*desc.MessageDescriptor, error) {
-	fileDescs, err := desc.CreateFileDescriptors(sinker.Package().ProtoFiles)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't convert, should do this check much earlier: %w", err)
-	}
-
-	outputModuleType := sinker.OutputModuleTypeUnprefixed()
-
-	var msgDesc *desc.MessageDescriptor
-	for _, file := range fileDescs {
-		msgDesc = file.FindMessage(outputModuleType)
-		if msgDesc != nil {
-			return msgDesc, nil
-		}
-	}
-
-	return nil, fmt.Errorf("output module descriptor not found")
-}
-
-func outputProtoreflectMessageDescriptor(sinker *sink.Sinker) (protoreflect.MessageDescriptor, error) {
+func outputMessageDescriptor(sinker *sink.Sinker) (protoreflect.MessageDescriptor, error) {
 	outputTypeName := protoreflect.FullName(sinker.OutputModuleTypeUnprefixed())
 	value, err := protox.FindMessageByNameInFiles(sinker.Package().ProtoFiles, outputTypeName)
 	if err != nil {
